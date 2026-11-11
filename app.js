@@ -1025,6 +1025,7 @@
   async function renderLeagueHomeLive() {
     const service=liveReadModel();
     if(!service){renderLiveState('League data unavailable','The canonical league service has not loaded.','warning');return;}
+    if(!pageContent.children.length)renderLiveState('Loading league…','Fetching the latest teams, standings and schedule.');
     pageContent.setAttribute('aria-busy','true');
     try{
       // 6.5.1a — Home critical render path.
@@ -1198,6 +1199,8 @@
     }catch(error){
       console.error('[Home Live Integration]',error);
       if(routeBase(currentAppRoute())==='home')renderLiveState('League data unavailable',error.message||'League data could not be loaded.','warning');
+    }finally{
+      if(routeBase(currentAppRoute())==='home')pageContent.removeAttribute('aria-busy');
     }
   }
   function renderLeagueHome() {
@@ -10236,7 +10239,7 @@ function canonicalPlayerDashboardStats(playerId='') {
   });
 
   // 7.3.7 — ownership careers plus player and mobile experience remediation.
-  const VISIBLE_RELEASE = '8.2.34';
+  const VISIBLE_RELEASE = '8.2.35';
   function visibleEnvironment() {
     const hostname=String(window.location.hostname||'').toLowerCase();
     if(hostname==='franchisehq.app'||hostname==='franchise-hq.pages.dev')return 'Production';

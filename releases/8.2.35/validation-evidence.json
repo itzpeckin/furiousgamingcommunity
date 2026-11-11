@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.35",
+  "status": "validated-production-authorized",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0,
+    "status": "passed"
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false,
+      "command": "node tools/check-migrations.mjs --strict",
+      "canonicalMigrations": 39,
+      "archivedLegacyFiles": 19,
+      "requiredTables": 142
+    },
+    "guestStartup": {
+      "status": "passed",
+      "passed": true,
+      "tests": 38,
+      "suites": [
+        "tests/import/live-data-experience.test.mjs",
+        "tests/ui/public-demo.test.mjs",
+        "tests/security/public-league.test.mjs"
+      ],
+      "coverage": [
+        "safe server-resolved tenant metadata available synchronously in the public shell",
+        "one tenant-resolution event after establishing the canonical URL",
+        "delayed first-time roster read without duplicate tenant invalidation",
+        "mismatched bootstrap metadata and alias isolation",
+        "explicit League Home loading state and Browse rosters visitor action"
+      ]
+    },
+    "automatedTests": {
+      "status": "passed",
+      "passed": true,
+      "strictGatePassed": true,
+      "tests": 714,
+      "initialRun": {
+        "tests": 713,
+        "passed": 711,
+        "failed": 2,
+        "failureCause": "Two obsolete 8.2.34 marker assertions; both corrected and their 10-test suites passed."
+      },
+      "passedTests": 714,
+      "failedTests": 0,
+      "command": "node tools/run-quality.mjs --strict",
+      "durationMs": 76690.439051
+    },
+    "previewBrowser": {
+      "status": "not-run",
+      "passed": false
+    },
+    "productionBrowser": {
+      "status": "not-run",
+      "passed": false
+    },
+    "versionMarkerRegressions": {
+      "passed": true,
+      "tests": 10,
+      "note": "Both suites passed after stale 8.2.34 release-marker assertions were updated to 8.2.35."
+    },
+    "localBrowser": {
+      "status": "passed",
+      "passed": true,
+      "signedOut": true,
+      "environment": "Local application using an anonymous read-only production-data proxy; not a Cloudflare preview deployment.",
+      "viewports": [
+        "393x852",
+        "desktop"
+      ],
+      "leagueHome": {
+        "seasonYear": 2028,
+        "week": 16
+      },
+      "teams": 32,
+      "buccaneersRosterPlayers": 62,
+      "pages": [
+        "League Home",
+        "Browse rosters team directory",
+        "Buccaneers team roster",
+        "direct /teams/tb refresh",
+        "Tristan Wirfs player details"
+      ],
+      "finalCodeErrorReproduced": false
+    }
+  },
+  "scopeBoundaries": {
+    "databaseMigrationRequired": false,
+    "membershipAssignmentsChanged": false,
+    "importsRun": false,
+    "credentialsChanged": false,
+    "workerChangesRequired": false
+  },
+  "external": {
+    "githubPublication": {
+      "status": "not-run"
+    },
+    "hostedChecks": {
+      "status": "not-run"
+    },
+    "productionDeployment": {
+      "status": "not-run"
+    }
+  }
+}

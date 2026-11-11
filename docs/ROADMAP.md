@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** October 1, 2026
+**Updated:** November 11, 2026
 
 **Revision:** 3.12
 
-**Current production:** 8.2.1 import, EA collection and scheduling performance (PR #176; immutable tag v8.2.1).
+**Current production:** 8.2.34 public league browsing; Pages deployment `3153ba4d-c456-403c-9f00-f1b6f918dfb2` at exact Main commit `c808083d51c766417af2e7881adb41215821b336`.
 
-**Current work:** Operating acceptance following 8.2.1 performance improvements. Verified advances skip automatic recaps, scheduling uses bounded batches, and export/import checkpoints perform less repeated work. Billing is deferred until the operating flow is dependable; no provider has been chosen or connected. Weekly loadout recognition remains deferred.
+**Current work:** 8.2.35 repairs a visitor startup race that can leave only the public league banner visible. Synchronous tenant metadata, one canonical tenant-resolution event, visible home loading and direct roster entry are in scope. Billing, provider acceptance and weekly loadout recognition remain deferred.
 
-**Next gate:** Measure ordinary FGC and OTL exports/imports and a verified week advance in production. The 60–70-second average import target is not yet proven. Confirm same-week recaps and new-thread creation before old-thread deletion with external providers; retain the broader commissioner recovery acceptance tracked in docs/8.2-reliability-review.md.
+**Next gate:** Publish the validated candidate and verify signed-out phone/desktop league loading, team rosters and shared destinations in Cloudflare preview and production. The full strict gate passed all 714 tests; local phone/desktop acceptance and 38 focused regressions also passed. The existing import-performance and provider acceptance work in docs/8.2-reliability-review.md remains open.
 
 ## Product decisions
 
@@ -1202,3 +1202,8 @@ Requested: repair the entire offseason/new-season path and make EA Free Agents a
 ## 8.2.14 - Season turnover and archive continuity
 
 Repair empty EA playoff placeholders, preserve actionable season mismatch errors, finish rejected capture jobs, and seed missing career summaries during Archive Season. Recover only FGC's missing 2027 summaries from its frozen snapshot under the documented guarded plan. Fresh live preseason collection remains acceptance; do not rearchive or reconnect as a season workaround. Billing, cost cleanup and other roadmap work remain deferred. See releases/8.2.14/release-record.md.
+
+
+## 8.2.35 — Public league startup and roster access
+
+Requested: diagnose and repair the phone visitor view that shows “Explore this league” above a blank page. The candidate makes safe server-resolved tenant metadata available synchronously, emits one tenant-resolution event after canonicalizing the URL, shows an explicit home loading state, and adds a Browse rosters visitor action. Regression coverage addresses delayed first-time roster reads plus mismatched bootstrap metadata and alias isolation. The strict migration gate, 38 focused regressions and local phone/desktop browser acceptance passed. The initial full run’s two obsolete release-marker assertions were corrected and their 10 tests passed; the final strict quality gate passed all 714 tests. Cloudflare preview acceptance and production deployment remain pending. Existing public-read authorization and protected membership/management operations remain in place. No migration, import, snapshot or membership operation is included. See [release record](../releases/8.2.35/release-record.md).

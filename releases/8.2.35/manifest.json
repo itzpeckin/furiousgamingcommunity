@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.35",
+  "releaseType": "public-league-startup-repair",
+  "status": "validated-production-authorized",
+  "sourceBaseline": {
+    "tag": "commit:c808083d51c766417af2e7881adb41215821b336",
+    "commit": "c808083d51c766417af2e7881adb41215821b336"
+  },
+  "implementationBranch": "codex/franchisehq-8.2.35-guest-view",
+  "knownInheritedIssues": [],
+  "repositoryPublication": {
+    "authorized": true,
+    "status": "not-run"
+  },
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "status": "not-run",
+    "currentRelease": "8.2.34",
+    "candidateRelease": "8.2.35",
+    "currentPagesDeployment": "3153ba4d-c456-403c-9f00-f1b6f918dfb2",
+    "currentCommit": "c808083d51c766417af2e7881adb41215821b336",
+    "currentMigration": 56,
+    "candidateMigration": 56
+  },
+  "requiredArtifacts": [
+    "releases/8.2.35/release-record.md",
+    "releases/8.2.35/validation-evidence.json",
+    "releases/8.2.35/recovery-plan.md"
+  ]
+}

@@ -13,8 +13,9 @@ import {
 } from '../../functions/_lib/live-data-experience.js';
 import { normalizePlayer, normalizeStanding, normalizeTeam } from '../../functions/api/leagues/[leagueSlug]/snapshot/read-model.js';
 
-async function sourceLifecycleFixture(){
+async function sourceLifecycleFixture({publicTenant=null,routePath='/leagues/league-a',requestedSlug=null}={}){
   const listeners=new Map(),requests=[],stored=new Map();
+  const location={origin:'https://example.test',pathname:routePath,search:'?source=invite',hash:'#roster'};
   let tenant={id:'route-placeholder',slug:'league-a',serverResolved:false};
   const HQ={leagueTenant:{current:()=>tenant,getCurrentLeague:()=>tenant},
     defineModuleService(_module,name,service,options){HQ[options?.alias||name]=service;return service;},
@@ -23,18 +24,66 @@ async function sourceLifecycleFixture(){
     appRouter:{render(){}},events:{emit(){}}};
   const context={URL,console,structuredClone,Date,Map,setTimeout,clearTimeout,
     CustomEvent:class{constructor(type,options={}){this.type=type;this.detail=options.detail;}},
-    location:{origin:'https://example.test',pathname:'/leagues/league-a',hash:'#commissioner'},
+    location,
+    history:{replaceState(_state,_title,path){const next=new URL(path,location.origin);location.pathname=next.pathname;location.search=next.search;location.hash=next.hash;}},
     document:{readyState:'loading',addEventListener(){},querySelector:()=>null},
+    localStorage:{getItem:()=>null,setItem(){}},
     sessionStorage:{getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value)},
-    window:{FranchiseHQ:HQ,localStorage:{getItem:()=>null},addEventListener(name,fn){listeners.set(name,[...(listeners.get(name)||[]),fn]);},
+    window:{FranchiseHQ:HQ,__FHQ_PUBLIC_VIEW__:publicTenant?{readOnly:true,slug:publicTenant.slug,requestedSlug:requestedSlug||publicTenant.slug,tenant:publicTenant}:null,
+      localStorage:{getItem:()=>null},addEventListener(name,fn){listeners.set(name,[...(listeners.get(name)||[]),fn]);},
       dispatchEvent(event){for(const fn of listeners.get(event.type)||[])fn(event);}},
     fetch:url=>new Promise(resolve=>requests.push({url,resolve:payload=>resolve({ok:true,json:async()=>payload})}))};
-  for(const file of ['repository','data-state','live-read-model','live-snapshot-boot']){
+  for(const file of [...(publicTenant?['league-tenant']:[]),'repository','data-state','live-read-model','live-snapshot-boot']){
     runInNewContext(await readFile(new URL(`../../league-engine/${file}.js`,import.meta.url),'utf8'),context);
   }
-  return {HQ,requests,resolveTenant(next){tenant=next;context.window.dispatchEvent(new context.CustomEvent('franchisehq:league-tenant-changed'));},
+  return {HQ,requests,location,resolveTenant(next){tenant=next;context.window.dispatchEvent(new context.CustomEvent('franchisehq:league-tenant-changed'));},
     summary:(id='snapshot-a',slug='league-a',leagueId='tenant-a')=>({state:'live',league:{id:leagueId,slug},snapshot:{id,seasonYear:2027,weekIndex:8},domains:{teams:32,statistics:878}})};
 }
+
+for(const requestedSlug of ['league-a','league-alias'])test(`a first-time public visitor loads the live roster through ${requestedSlug} without cancelled startup`,async()=>{
+  const f=await sourceLifecycleFixture({publicTenant:{id:'tenant-a',slug:'league-a',name:'League A'},
+    routePath:`/leagues/${requestedSlug}/teams/tb`,requestedSlug});
+  assert.equal(f.HQ.leagueTenant.current().serverResolved,true);
+  assert.equal(f.location.pathname,'/leagues/league-a/teams/tb','canonicalization preserves the team deep link');
+  assert.equal(f.location.search,'?source=invite');assert.equal(f.location.hash,'#roster');
+  assert.equal(f.requests.length,1,'the document already resolved the tenant; only the snapshot is requested');
+  assert.match(f.requests[0].url,/\/api\/leagues\/league-a\/snapshot\/read-model$/);
+  const roster=f.HQ.liveData.getPlayers();
+  f.requests[0].resolve(f.summary());
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.requests.length,2,'the roster read follows the same startup snapshot');
+  f.requests[1].resolve({ok:true,records:[{id:'player-a',displayName:'Roster Player'}],nextCursor:null});
+  assert.equal((await roster)[0].displayName,'Roster Player');
+  assert.equal(f.HQ.leagueData.status().activeMode,'live');
+  assert.equal(f.HQ.leagueRepository.current().source.snapshotId,'snapshot-a');
+  assert.equal(f.HQ.liveData.diagnostics().lastError,null);
+});
+
+test('tenant hydration ignores foreign public metadata and publishes one canonical resolution',async()=>{
+  const script=await readFile(new URL('../../league-engine/league-tenant.js',import.meta.url),'utf8');
+  const events=[],requests=[];
+  const location={pathname:'/leagues/league-alias',search:'',hash:'#teams'};
+  const HQ={defineModuleService(_module,name,service){this[name]=service;}};
+  const context={console,structuredClone,location,localStorage:{getItem:()=>null,setItem(){}},
+    history:{replaceState(_state,_title,path){location.pathname=path.split('#')[0];}},
+    CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},
+    window:{FranchiseHQ:HQ,__FHQ_PUBLIC_VIEW__:{readOnly:true,slug:'other-league',requestedSlug:'other-alias',tenant:{id:'other-id',slug:'other-league'}},
+      dispatchEvent:event=>events.push({event,current:HQ.leagueTenant.current()})},
+    fetch:url=>new Promise(resolve=>requests.push({url,resolve}))};
+  runInNewContext(script,context);
+  assert.equal(HQ.leagueTenant.current().serverResolved,false);
+  assert.equal(HQ.leagueTenant.current().slug,'league-alias');
+  assert.equal(requests.length,1);
+  assert.equal(requests[0].url,'/api/leagues/league-alias');
+  requests[0].resolve({ok:true,json:async()=>({ok:true,tenant:{id:'tenant-a',slug:'league-a',name:'League A'}})});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(events.length,1,'resolution must not restart live reads twice');
+  assert.equal(events[0].event.detail.type,'league-resolved');
+  assert.equal(events[0].current.id,'tenant-a');
+  assert.equal(events[0].current.slug,'league-a');
+  assert.equal(events[0].current.serverResolved,true);
+  assert.equal(location.pathname,'/leagues/league-a');
+});
 
 test('Madden Data becomes selectable after tenant resolution interrupts startup and concurrent refreshes',async()=>{
   const f=await sourceLifecycleFixture();
