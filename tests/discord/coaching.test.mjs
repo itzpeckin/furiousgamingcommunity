@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFile} from 'node:fs/promises';
 import {ROOT,walkFiles} from '../../tools/lib/project.mjs';
 import {configureCoaching,scanCoaching,coachingCommand} from '../../functions/_lib/discord-coaching.js';
-import {coachingImageLink,canonicalArchetype,readCoachingScreenshot} from '../../functions/_lib/coaching-images.js';
+import {coachingImageLink,coachingEvidence,imageResponse,canonicalArchetype,readCoachingScreenshot} from '../../functions/_lib/coaching-images.js';
 import {eaWeeklyReady} from '../../functions/_lib/ea-direct.js';
 import {proveCurrentSchedulePeriod} from '../../functions/_lib/schedule-integrity.js';
 import {onRequestPost as scannerPost} from '../../functions/api/internal/coaching-scan.js';
@@ -93,6 +93,23 @@ test('coaching accepts known public screenshot hosts, ignores instructions and c
     f.env.AI.run=async()=>({response:JSON.stringify({archetypeText:'Offensive Guru',readable:false,conflict:false})});
     assert.equal((await readCoachingScreenshot(f.env,[photo],{fetchImpl:f.fetchImpl})).archetype,null);
   }finally{f.sqlite.close();}
+});
+
+test('Xbox share formats normalize to HTTPS without allowing insecure image hosts or lookalikes',async()=>{
+  const expected='https://xbox.com/play/media/yBYtANeDZK';
+  for(const link of [expected,'http://xbox.com/play/media/yBYtANeDZK','xbox.com/play/media/yBYtANeDZK']){
+    assert.equal(coachingImageLink(link),expected);
+    assert.deepEqual(coachingEvidence({content:`Screenshot: <${link}> (${expected}),`}),[expected]);
+  }
+  for(const link of ['http://cdn.discordapp.com/image.png','http://images-eds-ssl.xboxlive.com/image.png','http://xbox.com.evil.test/play/media/id','http://user@xbox.com/play/media/id','http://xbox.com:444/play/media/id','ftp://xbox.com/play/media/id','https://evil.test/xbox.com/play/media/id','evil.xbox.com/play/media/id','xbox.com/profile/id']){
+    assert.equal(coachingImageLink(link),null);assert.deepEqual(coachingEvidence({content:link}),[]);
+  }
+  const fetched=[];
+  await imageResponse('http://xbox.com/play/media/yBYtANeDZK',async url=>{
+    fetched.push(url);
+    return new Response(new Uint8Array([137,80,78,71]),{headers:{'content-type':'image/png'}});
+  });
+  assert.deepEqual(fetched,[expected]);
 });
 
 test('Xbox regional redirects resolve to a validated image and unsafe redirects fail closed',async()=>{

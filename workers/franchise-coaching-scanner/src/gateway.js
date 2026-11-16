@@ -1,11 +1,12 @@
 // One connection coordinator per Discord bot shard. Evidence stays in Discord;
 // only eligible thread/message IDs are persisted for durable delivery.
+import {coachingEvidence} from '../../../functions/_lib/coaching-images.js';
 export const snow=value=>/^\d{17,20}$/.test(String(value||''));
 export function screenshotEvent(packet,routes){
   if(!['MESSAGE_CREATE','MESSAGE_UPDATE'].includes(packet.t))return null;
   const m=packet.d;
   if(!m||m.author?.bot||![m.id,m.guild_id,m.channel_id].every(snow)||!routes.has(`${m.guild_id}:${m.channel_id}`))return null;
-  if(packet.t==='MESSAGE_CREATE'&&!m.attachments?.some(a=>/^image\//.test(a.content_type||''))&&!/https:\/\/(?:www\.)?xbox\.com\//i.test(m.content||''))return null;
+  if(packet.t==='MESSAGE_CREATE'&&!m.attachments?.some(a=>/^image\//.test(a.content_type||''))&&!coachingEvidence({content:m.content}).length)return null;
   return {guildId:m.guild_id,channelId:m.channel_id,messageId:m.id};
 }
 export class GatewayConnection {

@@ -255,7 +255,9 @@ export async function scanLoadouts(env,db,{fetchImpl=fetch,readScreenshot=readLo
   let submissions=[],threads=[];
   try{
     threads=await currentThreads(db,config.league_id,config.guild_id);
-    await boundedMap(threads.slice(0,4),4,async thread=>{
+    // History checks share bot/application routes with one in-flight request.
+    // Serialize intake so a batch cannot reject itself before checking images.
+    await boundedMap(threads.slice(0,4),1,async thread=>{
       await db.prepare('INSERT OR IGNORE INTO discord_loadout_threads(league_id,thread_id) VALUES(?,?)').bind(config.league_id,thread.id).run();
       await ingest(env,db,config,thread,fetchImpl);
     });

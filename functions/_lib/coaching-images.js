@@ -3,10 +3,13 @@ const evidenceError=message=>Object.assign(new Error(message),{retryable:false})
 const supportedImage=url=>IMAGE_HOSTS.has(url.hostname)||/^[a-z0-9-]+\.xboxlive\.com$/.test(url.hostname);
 export function coachingImageLink(value){
   try{
-    const url=new URL(value);
-    if(url.protocol!=='https:'||url.username||url.password||url.port)return null;
-    if(supportedImage(url))return url.href;
-    if(['www.xbox.com','xbox.com'].includes(url.hostname)&&/^\/(?:[a-z]{2}-[a-z]{2}\/)?play\/media\/[A-Za-z0-9_-]+\/?$/i.test(url.pathname))return url.href;
+    const url=new URL(/^(?:www\.)?xbox\.com\//i.test(value)?`https://${value}`:value);
+    if(url.username||url.password||url.port)return null;
+    if(['http:','https:'].includes(url.protocol)&&['www.xbox.com','xbox.com'].includes(url.hostname)&&/^\/(?:[a-z]{2}-[a-z]{2}\/)?play\/media\/[A-Za-z0-9_-]+\/?$/i.test(url.pathname)){
+      // Share links may omit HTTPS; only the validated Xbox page is upgraded.
+      url.protocol='https:';return url.href;
+    }
+    if(url.protocol==='https:'&&supportedImage(url))return url.href;
   }catch{}
   return null;
 }
@@ -18,7 +21,7 @@ export function coachingEvidence(message){
     const url=coachingImageLink(attachment.url);
     if(url)found.push(url);
   }
-  for(const text of String(message.content||'').match(/https:\/\/[^\s<>]+/g)||[]){
+  for(const text of String(message.content||'').match(/https?:\/\/[^\s<>]+|(?<![\w./:@-])(?:www\.)?xbox\.com\/[^\s<>]+/gi)||[]){
     const url=coachingImageLink(text.replace(/[),]+$/,''));
     if(url)found.push(url);
   }

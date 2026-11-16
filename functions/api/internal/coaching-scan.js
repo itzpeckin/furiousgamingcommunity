@@ -31,7 +31,9 @@ export async function onRequestPost(context){
   // Idempotent app-owned assets; provisioning never holds up a screenshot.
   if(context.env.LOADOUT_CUSTOM_EMOJI_ENABLED==='true')try{await prepareLoadoutEmojis(context.env);}
   catch{console.warn(JSON.stringify({event:'loadout-emoji-provision-retry'}));}
-  const [archetypes,loadouts]=await Promise.all([scanCoaching(context.env,db),scanLoadouts(context.env,db)]);
+  // Both scanners use the same application/permission routes and pacing bucket.
+  const archetypes=await scanCoaching(context.env,db);
+  const loadouts=await scanLoadouts(context.env,db);
   return Response.json({ok:archetypes.ok&&loadouts.ok,idle:Boolean(archetypes.idle&&loadouts.idle),
     processed:Boolean(archetypes.processed||loadouts.processed),archetypes,loadouts,commandsRegistered,
     imageReaderAvailable:Boolean(context.env.AI?.run),messageContentAvailable},{headers:{'cache-control':'no-store'}});

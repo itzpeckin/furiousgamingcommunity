@@ -21,6 +21,16 @@ test('Gateway filters unrelated channels, bots and non-images; partial edits rem
  assert.equal(screenshotEvent({...packet,d:{...packet.d,attachments:[]}},routes),null);
  assert.ok(screenshotEvent({...packet,t:'MESSAGE_UPDATE',d:{id,guild_id:guild,channel_id:channel}},routes));
 });
+test('Gateway accepts the same Xbox share formats as history intake only in eligible threads',()=>{
+ const routes=new Set([`${guild}:${channel}`]);
+ for(const content of ['http://xbox.com/play/media/yBYtANeDZK','https://www.xbox.com/en-US/play/media/yBYtANeDZK','xbox.com/play/media/yBYtANeDZK']){
+  const event={...packet,d:{...packet.d,attachments:[],content}};
+  assert.equal(screenshotEvent(event,routes).messageId,id);
+  assert.equal(screenshotEvent(event,new Set()),null);
+ }
+ for(const content of ['http://xbox.com.evil.test/play/media/id','http://xbox.com/profile/id','http://127.0.0.1/a.png'])
+  assert.equal(screenshotEvent({...packet,d:{...packet.d,attachments:[],content}},routes),null);
+});
 test('Gateway saves a durable event before advancing resume sequence and keeps edits arriving during a check',async()=>{
  const f=fixture();let release;f.g.api=async()=>new Promise(r=>{release=r;});
  await f.g.message(f.ws,JSON.stringify(packet));
