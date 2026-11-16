@@ -7,7 +7,7 @@ import { createScreenshotDecoder, staffContext, grayPng, dataImage } from './loa
 import { normalizeLoadout } from './loadout-rules.js';
 import { boundedMap } from './bounded-map.js';
 import { normalizePlaysheets } from './playsheet-catalog.js';
-import { fastLoadout } from './loadout-fast.js';
+import { fastLoadout, proposeConsoleLoadout } from './loadout-fast.js';
 
 export const LOADOUT_READER_VERSION=READER_VERSION;
 export const loadoutReaderReady=env=>Boolean(env?.AI?.run&&env.COACHING_SCANNER_SECRET&&env.LOADOUT_READER_VERSION===READER_VERSION);
@@ -109,8 +109,8 @@ export async function readLoadoutScreenshot(env,urls,{fetchImpl=fetch,decodeImag
   decode ||= await defaultDecoder();
   const image=decode(source),references=[...glyphReferences(),...glyphVariants()];
   const fast=fastLoadout(image,references);if(fast){reads.push({...fast,readerVersion:READER_VERSION});continue;}
-  let proposal=proposeLoadout(image,references);
-  if(!proposal||proposal.slots.filter(s=>s.decision.status==='matched').length<2){
+  let proposal=proposeConsoleLoadout(image,references)||proposeLoadout(image,references);
+  if(!proposal||proposal.method!=='console-labels'&&proposal.slots.filter(s=>s.decision.status==='matched').length<2){
    const whole=await image.context([0,0,image.width,image.height]);
    const located=await layoutCall(env,LAYOUT_MODEL,locatorRequest(whole),deadline);
    proposal=proposeLocatedLoadout(image,references,located)||proposal;

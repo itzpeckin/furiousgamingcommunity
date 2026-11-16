@@ -7,7 +7,9 @@ import {LOADOUT_CATALOG} from '../../functions/_lib/loadout-catalog.js';
 import {GLYPH_TEMPLATES,glyphReferences,TEMPLATE_CATALOG_VERSION} from '../../functions/_lib/loadout-glyph-templates.js';
 import {GLYPH_VARIANTS,glyphVariants} from '../../functions/_lib/loadout-glyph-variants.js';
 import {rankGlyph,matchDecision,detectStaffRow,corroboratePosition,proposeLocatedLoadout,SIZE} from '../../functions/_lib/loadout-glyphs.js';
-import {imageDimensions,grayPng} from '../../functions/_lib/loadout-raster.js';
+import {imageDimensions,grayPng,createScreenshotDecoder,dataImage} from '../../functions/_lib/loadout-raster.js';
+import {fastLoadout,proposeConsoleLoadout} from '../../functions/_lib/loadout-fast.js';
+import {initWasm,Resvg} from '../../functions/_lib/vendor/resvg/index.js';
 import {combineLayout,layoutRequest,readLoadoutScreenshot,LOADOUT_READER_VERSION,transcribedPlaysheets} from '../../functions/_lib/loadout-images.js';
 import {evaluateLoadout} from '../../functions/_lib/loadout-rules.js';
 const layout=(count=6)=>({kind:'loadout',staffLabelVisible:true,complete:true,slots:Array.from({length:6},(_,i)=>({slot:i+1,state:i<count?'equipped':'locked',stateClear:true}))});
@@ -127,4 +129,44 @@ test('public readiness reflects the same activation switch as the scanner withou
 
 test('isolated icon variants use catalog identities and retain source fingerprints',()=>{
  for(const variant of GLYPH_VARIANTS){assert.ok(LOADOUT_CATALOG.abilities.some(a=>a.id===variant.id));assert.match(variant.sourceHash,/^[a-f0-9]{64}$/);assert.equal(Buffer.from(variant.pixels,'base64').length,SIZE*SIZE);}
+});
+
+test('a console row with five unchecked icons and one checkmark preserves verified geometry for the AI reader',async()=>{
+ await initWasm(await WebAssembly.compile(await readFile(`${ROOT}/functions/_lib/vendor/resvg/index_bg.wasm`)));
+ const bytes=await readFile(`${ROOT}/tests/fixtures/loadouts/console-one-checkmark.png`);
+ const decodeImage=createScreenshotDecoder(Resvg),image=decodeImage(dataImage(bytes));
+ const references=[...glyphReferences(),...glyphVariants()];
+ assert.equal(detectStaffRow(image),null,'there is no checkmark group in this real capture');
+ assert.equal(fastLoadout(image,references),null,'ambiguous QB lettering must use independent confirmation');
+ const proposed=proposeConsoleLoadout(image,references);
+ assert.equal(proposed.method,'console-labels');
+ assert.equal(proposed.slots.length,6);
+ const expected=['island-kings','inside-stuffed','sideline-2-sideline','sheddables','mano-a-mano','practician-qb'];
+ assert.deepEqual(proposed.slots.slice(0,5).map(s=>s.decision.ids[0]),expected.slice(0,5));
+ assert.equal(proposed.slots[5].decision.status,'uncertain');
+ const calls=[];
+ const env={AI:{run:async(model,request)=>{
+  const prompt=request.messages[0].content;calls.push(prompt);
+  assert.doesNotMatch(prompt,/Locate ONLY/,'confirmed console coordinates must not be discarded');
+  const output=prompt.startsWith('Transcribe')
+   ?{kind:'loadout',complete:true,names:['Dollar Playsheet','Run Stop Playsheet','Nickel Playsheet','Air Raid Gun Playsheet'],locked:[],empty:0}
+   :{...layout(),slots:layout().slots.map(s=>({...s,positionText:s.slot===6?'QB':null}))};
+  return {choices:[{finish_reason:'stop',message:{content:JSON.stringify(output)}}]};
+ }}};
+ const observed=await readLoadoutScreenshot(env,['https://xbox.com/play/media/fixture'],{decodeImage,
+  fetchImpl:async url=>url.includes('xbox.com/')?new Response('<meta property="og:image" content="https://images-eds-ssl.xboxlive.com/image?fixture">',{headers:{'content-type':'text/html'}}):new Response(bytes,{headers:{'content-type':'image/png'}})});
+ assert.equal(calls.length,2);
+ assert.deepEqual(observed.slots.map(s=>s.candidates[0]),expected);
+ assert.deepEqual(observed.playsheets.slots.map(s=>s.id),['dollar','run-stop','nickel','air-raid-gun']);
+ assert.equal(evaluateLoadout(observed,{banDuplicates:true,requirePlaysheets:true}).status,'legal');
+ assert.equal(evaluateLoadout(observed,{banned:['mano-a-mano'],requirePlaysheets:true}).status,'illegal');
+ assert.equal(evaluateLoadout(observed,{bannedPlaysheets:['air-raid-gun'],requirePlaysheets:true}).status,'illegal');
+ assert.equal(combineLayout(proposed,{...layout(),complete:false}).complete,false,'geometry alone never approves a clipped row');
+ const missingLabel={...image,data:image.data.slice()};
+ missingLabel.data.fill(0,610*image.width*4,640*image.width*4);
+ assert.equal(proposeConsoleLoadout(missingLabel,references),null);
+ assert.equal(proposeConsoleLoadout({...image,width:1500},references),null);
+ const blankSlot={...image,data:image.data.slice()};
+ for(let y=640;y<720;y++)blankSlot.data.fill(0,(y*image.width+490)*4,(y*image.width+568)*4);
+ assert.equal(combineLayout(proposeConsoleLoadout(blankSlot,references),layout()).complete,false,'missing glyphs never inherit an identity');
 });

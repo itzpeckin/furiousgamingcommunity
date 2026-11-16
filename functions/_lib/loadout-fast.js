@@ -4,6 +4,24 @@ import {FAST_TEMPLATES} from './loadout-fast-templates.js';
 
 export const TEXT_BOXES=[[.503,.718,.128,.038],[.654,.718,.138,.038],[.503,.765,.128,.038],[.654,.765,.138,.038]];
 export const LABEL_BOXES=[[.159,.683,.102,.030],[.474,.685,.10,.026]];
+const staffBox=i=>[.1645+i*.0475,.713,.0456,.0806];
+function consoleLayout(image){
+  if(Math.abs(image.width/image.height-16/9)>.015)return false;
+  return LABEL_BOXES.every((box,i)=>textMatch(textPrint(rectangle(image,box)),FAST_TEMPLATES.filter(t=>t.kind==='label'))?.id===['staff','playsheets'][i]);
+}
+// Preserve independently verified console geometry when a glyph or playsheet
+// needs the slower reader. Unchecked cards do not form a checkmark group.
+// This only proposes crops; the layout model still verifies all six states.
+export function proposeConsoleLoadout(image,references){
+  if(!consoleLayout(image))return null;
+  const slots=Array.from({length:6},(_,i)=>{
+    const [x,y,w,h]=staffBox(i);
+    const quad=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([px,py])=>[px*image.width,py*image.height]);
+    const tile=sampleQuad(image,quad),ranked=rankGlyph(tile,references);
+    return {quad,tile,ranked,decision:matchDecision(ranked),detectedCheck:false};
+  });
+  return {slots,detected:{spacing:[image.width*.0475,0]},method:'console-labels'};
+}
 export function rectangle(image,[x,y,w,h],width=160,height=32){return sampleQuad(image,[[x*image.width,y*image.height],[(x+w)*image.width,y*image.height],[(x+w)*image.width,(y+h)*image.height],[x*image.width,(y+h)*image.height]],width,height);}
 // Crop to the visible lettering, preserving aspect ratio. This deliberately
 // rejects clipped lettering and low-contrast evidence rather than guessing.
@@ -54,11 +72,10 @@ export function linePosition(tile,references){
 export function fastLoadout(image,references){
   // Initial supported geometry is a full 16:9 console capture. Phone photos,
   // clipped screenshots and unfamiliar layouts use the independent reader.
-  if(Math.abs(image.width/image.height-16/9)>.015)return null;
-  for(let i=0;i<LABEL_BOXES.length;i++)if(textMatch(textPrint(rectangle(image,LABEL_BOXES[i])),FAST_TEMPLATES.filter(t=>t.kind==='label'))?.id!==['staff','playsheets'][i])return null;
+  if(!consoleLayout(image))return null;
   const slots=[];
   for(let i=0;i<6;i++){
-    const tile=rectangle(image,[.1645+i*.0475,.713,.0456,.0806],SIZE,SIZE);
+    const tile=rectangle(image,staffBox(i),SIZE,SIZE);
     const withLocks=rankGlyph(tile,[...references,...FAST_TEMPLATES.filter(t=>t.kind==='staff-locked')]);
     if(withLocks[0]?.id==='locked'&&withLocks[0].score>=.92&&withLocks[0].score-(withLocks[1]?.score||0)>=.15){slots.push({slot:i+1,state:'locked',clear:true,candidates:[]});continue;}
     const ranked=withLocks.filter(r=>r.id!=='locked');let decision=matchDecision(ranked);

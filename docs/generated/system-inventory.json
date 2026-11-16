@@ -269,9 +269,9 @@
       ".js": 328,
       ".json": 8,
       ".jsonc": 4,
-      ".md": 289,
+      ".md": 290,
       ".mjs": 79,
-      ".png": 7,
+      ".png": 8,
       ".sql": 59,
       ".txt": 3,
       ".wasm": 1,
@@ -360,7 +360,7 @@
         "file": "tests/import/ea-capture.test.mjs"
       }
     ],
-    "total": 888
+    "total": 890
   },
   "frontend": {
     "assets": [
@@ -1997,7 +1997,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.35",
+  "release": "8.2.36",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

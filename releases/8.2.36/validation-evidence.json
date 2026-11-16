@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.36",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0,
+    "status": "passed"
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false
+    },
+    "loadoutReader": {
+      "passed": true,
+      "focusedTests": 16,
+      "liveWorkersAI": true,
+      "source": "https://xbox.com/play/media/yBYtANeDZK",
+      "staffSlots": 6,
+      "playsheetSlots": 4,
+      "duplicateRuleResult": "legal",
+      "model": "@cf/google/gemma-4-26b-a4b-it",
+      "calls": 2
+    },
+    "strictGate": {
+      "command": "node tools/run-quality.mjs --strict",
+      "failed": 0,
+      "finalFocusedTests": 16,
+      "status": "passed",
+      "tests": 715
+    }
+  },
+  "scopeBoundaries": {
+    "databaseMigrationRequired": false,
+    "leagueRulesChanged": false,
+    "manualDiscordMessages": false,
+    "readerActivationVersion": "m27-glyph-reader-4",
+    "recheckBehavior": "Existing scanner re-evaluates current-week submissions saved with an older reader version and edits existing reports."
+  }
+}
