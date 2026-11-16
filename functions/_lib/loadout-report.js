@@ -1,10 +1,11 @@
 import {ABILITY_BY_ID} from './loadout-catalog.js';
 import {PLAYSHEET_BY_ID} from './playsheet-catalog.js';
+export const LOADOUT_REPORT_VERSION='m27-loadout-report-2';
 
 export function reportMarks(env){
   const emoji=(name,id,fallback)=>/^\d{17,20}$/.test(String(id||''))?`<:${name}:${id}>`:fallback;
   // Plain glyph fallback never turns an unresolved read into a pass.
-  return {legal:emoji('fhq_pass',env.LOADOUT_PASS_EMOJI_ID,'✓'),illegal:emoji('fhq_fail',env.LOADOUT_FAIL_EMOJI_ID,'✕'),unreadable:'?',unused:'—'};
+  return {legal:emoji('fhq_pass',env.LOADOUT_PASS_EMOJI_ID,'✓'),illegal:emoji('fhq_fail',env.LOADOUT_FAIL_EMOJI_ID,'✕'),unreadable:'?',unused:'—',unassigned:'—'};
 }
 export function loadoutReportLines(observed,result,env){
   const mark=reportMarks(env),staff=result.slotResults||observed?.slots?.map(s=>({...s,status:'unreadable'}))||[];
@@ -23,6 +24,8 @@ export function loadoutReportLines(observed,result,env){
   }
   const duplicate=result.duplicateCheck;
   lines.push('',`${mark[duplicate]||'—'} **Duplicate Ability Check: ${duplicate==='off'?'NOT BANNED':duplicate==='illegal'?'DUPLICATE DETECTED':duplicate==='legal'?'NONE DETECTED':'UNRESOLVED'}**`);
-  lines.push('',`${mark[result.status]||'?'} **LOADOUT STATUS: ${result.status==='legal'?'LEGAL':result.status==='illegal'?'ILLEGAL':'UNRESOLVED'}**`);
+  const status=result.status==='unassigned'?`NOT COUNTED — ${result.assignmentIssue==='wrong-thread'?'WRONG MATCHUP THREAD':'TEAM LINK NEEDED'}`
+    :result.status==='legal'?'LEGAL':result.status==='illegal'?'ILLEGAL':'UNRESOLVED';
+  lines.push('',`${mark[result.status]||'?'} **LOADOUT STATUS: ${status}**`);
   return lines.join('\n').slice(0,4000);
 }

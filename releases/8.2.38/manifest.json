@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.38",
+  "releaseType": "loadout-report-context-fix",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "tag": "v8.2.37",
+    "commit": "3f578da76cf3eda6bb202a6dd85595bce15c21ff"
+  },
+  "implementationBranch": "fix/loadout-report-context",
+  "knownInheritedIssues": [],
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "authorization": "Requested follow-up Coach Ability report correction under the approved fix and standing requested-release authorization.",
+    "currentRelease": "8.2.37",
+    "candidateRelease": "8.2.38",
+    "currentMigration": 56,
+    "candidateMigration": 56
+  },
+  "requiredArtifacts": [
+    "releases/8.2.38/release-record.md",
+    "releases/8.2.38/validation-evidence.json",
+    "releases/8.2.38/recovery-plan.md"
+  ]
+}

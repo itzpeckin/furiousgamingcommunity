@@ -9,7 +9,7 @@ import { normalizeLoadout, evaluateLoadout } from '../../functions/_lib/loadout-
 import { readLoadoutScreenshot, LOADOUT_READER_VERSION } from '../../functions/_lib/loadout-images.js';
 import { LOADOUT_CATALOG } from '../../functions/_lib/loadout-catalog.js';
 import {normalizePlaysheets,playsheetId,PLAYSHEET_CATALOG} from '../../functions/_lib/playsheet-catalog.js';
-import {loadoutReportLines} from '../../functions/_lib/loadout-report.js';
+import {loadoutReportLines,LOADOUT_REPORT_VERSION} from '../../functions/_lib/loadout-report.js';
 import {onRequestPost as eventEndpoint} from '../../functions/api/internal/loadout-event.js';
 import {onRequestPost as scannerEndpoint} from '../../functions/api/internal/coaching-scan.js';
 // Scanner tests isolate Discord/tenant state; pixel/model acceptance is in loadout-reader tests.
@@ -289,6 +289,64 @@ test('permanently invalid old-reader evidence is not rechecked forever after an 
   await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl,readScreenshot});
   assert.equal(reads,1);assert.equal(f.sqlite.prepare('SELECT status FROM discord_loadout_submissions').get().status,'unreadable');
  }finally{f.sqlite.close();}
+});
+
+test('a linked owner in the wrong matchup retains all six ability and four playsheet results without receiving approval',async()=>{
+  const f=await fixture();try{
+    await f.save({banned:[]});
+    f.sqlite.exec("UPDATE discord_schedule_threads SET home_team_key='lv',away_team_key='jax'");
+    for(const [key,name] of [['lv','Raiders'],['jax','Jaguars']])f.sqlite.prepare("INSERT INTO league_snapshot_records(snapshot_id,league_id,domain,external_id,data_json) VALUES('snapshot','a','teams',?,?)").run(key,JSON.stringify({external_id:key,abbreviation:key.toUpperCase(),display_name:name,team_name:name}));
+    const raw=sample(['island-kings','inside-stuffed','sideline-2-sideline','sheddables','mano-a-mano','practician-qb']);
+    raw.playsheets.slots=['Dollar','Run Stop','Nickel','Air Raid Gun'].map((name,i)=>({slot:i+1,state:'equipped',clear:true,name}));
+    f.env.AI.run=async()=>({response:JSON.stringify(raw)});
+    await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl});
+    const report=f.posts[0];
+    assert.match(report.content,/Wrong matchup thread/);assert.match(report.content,/linked to Buccaneers/);
+    assert.match(report.content,/Jaguars at Raiders/);assert.match(report.content,/no active matchup for Buccaneers/);
+    assert.doesNotMatch(report.content,/Team link needed|Link your Discord account/);
+    const text=report.embeds[0].description;
+    assert.equal((text.match(/· LEGAL/g)||[]).length,6);assert.equal((text.match(/Playsheet — LEGAL/g)||[]).length,4);
+    assert.match(text,/Duplicate Ability Check: NONE DETECTED/);
+    assert.match(text,/LOADOUT STATUS: NOT COUNTED — WRONG MATCHUP THREAD/);
+    assert.doesNotMatch(text,/UNRESOLVED|could not be fully read|LOADOUT STATUS: LEGAL/);
+    assert.equal(f.sqlite.prepare('SELECT status FROM discord_loadout_submissions').get().status,'unassigned');
+    f.sqlite.exec(`INSERT INTO discord_schedule_threads(id,league_id,snapshot_id,sync_run_id,discord_guild_id,parent_channel_id,discord_thread_id,game_external_id,season_year,week_index,home_team_key,away_team_key,status)
+      VALUES('own-thread','a','snapshot','sync','${guild}','${parent}','200000000000000014','own-game',2027,10,'tb','mia','active');
+      UPDATE discord_loadout_submissions SET timings_json='{}';`);
+    await handleLoadoutEvent(f.env,f.db,event,{fetchImpl:f.fetchImpl});
+    assert.match(f.posts.at(-1).content,/Post in <#200000000000000014>/);
+    assert.doesNotMatch(f.posts.at(-1).content,/no active matchup/);
+    assert.equal(f.sqlite.prepare('SELECT status FROM discord_loadout_submissions').get().status,'unassigned');
+  }finally{f.sqlite.close();}
+});
+
+test('missing team identity preserves identified violations and requests only the missing team link',async()=>{
+  const f=await fixture();try{
+    await f.save();f.sqlite.exec('UPDATE league_memberships SET active=0');
+    await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl});
+    const report=f.posts[0];assert.match(report.content,/Team link needed/);assert.doesNotMatch(report.content,/Wrong matchup thread/);
+    assert.match(report.embeds[0].description,/Camp Counselor · ILLEGAL/);
+    assert.match(report.embeds[0].description,/Dollar Playsheet — LEGAL/);
+    assert.match(report.embeds[0].description,/LOADOUT STATUS: NOT COUNTED — TEAM LINK NEEDED/);
+    assert.doesNotMatch(report.embeds[0].description,/UNRESOLVED|could not be fully read/);
+    assert.equal(f.sqlite.prepare('SELECT status FROM discord_loadout_submissions').get().status,'unassigned');
+  }finally{f.sqlite.close();}
+});
+
+test('report upgrades edit cached current-week checks once without rereading images or accepting a wrong matchup',async()=>{
+  const f=await fixture();try{
+    await f.save({banned:[]});await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl});
+    f.sqlite.exec("UPDATE discord_loadout_submissions SET status='unassigned',timings_json='{}'; UPDATE discord_schedule_threads SET home_team_key='mia',away_team_key='lv'");
+    assert.equal((await loadoutSettings(f.db,'a',f.env)).progress.reportsPending,1);
+    await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl});
+    const report=f.posts.at(-1),row=f.sqlite.prepare('SELECT * FROM discord_loadout_submissions').get();
+    assert.equal(f.calls.at(-1).method,'PATCH');assert.equal(f.posts.length,2);assert.equal(f.aiCalls(),1);
+    assert.match(report.content,/Wrong matchup thread/);assert.equal(row.status,'unassigned');
+    assert.equal(JSON.parse(row.timings_json).reportVersion,LOADOUT_REPORT_VERSION);
+    assert.equal((await loadoutSettings(f.db,'a',f.env)).progress.reportsPending,0);
+    await handleLoadoutEvent(f.env,f.db,event,{fetchImpl:f.fetchImpl,readScreenshot:async()=>{throw new Error('Cached image was reread');}});
+    await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl});assert.equal(f.posts.length,2);
+  }finally{f.sqlite.close();}
 });
 
 test('unrelated screenshots produce no bot verdict and another team cannot submit for this matchup',async()=>{

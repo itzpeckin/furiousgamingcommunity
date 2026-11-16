@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.38",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0,
+    "status": "passed"
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false
+    },
+    "reportRegression": {
+      "passed": true,
+      "focusedTests": 27,
+      "sixAbilitiesAndFourPlaysheetsPreserved": true,
+      "unlinkedAndWrongMatchupDistinct": true,
+      "cachedReportEditedOnceWithoutAI": true
+    },
+    "strictGate": {
+      "status": "passed",
+      "command": "node tools/run-quality.mjs --strict",
+      "tests": 722,
+      "failed": 0
+    },
+    "actualSubmissionReplay": {
+      "passed": true,
+      "abilities": 6,
+      "playsheets": 4,
+      "duplicateCheck": "legal",
+      "checkResult": "legal",
+      "overall": "not-counted-wrong-matchup"
+    }
+  },
+  "scopeBoundaries": {
+    "databaseMigrationRequired": false,
+    "leagueRulesChanged": false,
+    "manualDiscordMessages": false,
+    "readerActivationVersion": "m27-glyph-reader-4",
+    "reportVersion": "m27-loadout-report-2",
+    "archivedThreadsRemainExcluded": true,
+    "wrongMatchupNotAccepted": true
+  }
+}
