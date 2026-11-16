@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.37",
+  "releaseType": "loadout-check-delivery-fix",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "tag": "commit:67145a3d977239ddcfbfde44248d778360c3cf71",
+    "commit": "67145a3d977239ddcfbfde44248d778360c3cf71"
+  },
+  "implementationBranch": "fix/loadout-check-delivery",
+  "knownInheritedIssues": [],
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "authorization": "Follow-up to the requested and explicitly approved Coach Ability fix; standing requested-release authorization in RELEASE-PROCESS.md.",
+    "currentRelease": "8.2.36",
+    "candidateRelease": "8.2.37",
+    "currentMigration": 56,
+    "candidateMigration": 56
+  },
+  "requiredArtifacts": [
+    "releases/8.2.37/release-record.md",
+    "releases/8.2.37/validation-evidence.json",
+    "releases/8.2.37/recovery-plan.md"
+  ]
+}

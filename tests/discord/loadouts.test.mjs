@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import vm from 'node:vm';
 import { DatabaseSync } from 'node:sqlite';
 import { readFile } from 'node:fs/promises';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
@@ -10,6 +11,7 @@ import { LOADOUT_CATALOG } from '../../functions/_lib/loadout-catalog.js';
 import {normalizePlaysheets,playsheetId,PLAYSHEET_CATALOG} from '../../functions/_lib/playsheet-catalog.js';
 import {loadoutReportLines} from '../../functions/_lib/loadout-report.js';
 import {onRequestPost as eventEndpoint} from '../../functions/api/internal/loadout-event.js';
+import {onRequestPost as scannerEndpoint} from '../../functions/api/internal/coaching-scan.js';
 // Scanner tests isolate Discord/tenant state; pixel/model acceptance is in loadout-reader tests.
 const scanLoadouts=(env,db,options)=>runScanLoadouts(env,db,{...options,readScreenshot:options?.readScreenshot||(async()=>normalizeLoadout(JSON.parse((await env.AI.run()).response)))});
 function d1(sqlite){return {prepare(sql){const s=sqlite.prepare(sql);let args=[];const p={bind(...a){args=a;return p;},async first(){return s.get(...args)||null;},async all(){return {results:s.all(...args)};},async run(){return {meta:{changes:Number(s.run(...args).changes)}};}};return p;}};}
@@ -178,6 +180,52 @@ test('league settings preserve opt-in, reject unknown bans and stale writes, and
     await assert.rejects(f.save({enabled:false,revision:0}),/Another commissioner/);
     assert.equal((await loadoutSettings(f.db,'b',f.env)).banned.length,0);
   }finally{f.sqlite.close();}
+});
+
+test('HTTP Xbox reposts reach both live and recovery checks as secure evidence',async()=>{
+  for(const live of [false,true]){
+    const f=await fixture();try{
+      await f.save();f.message.attachments=[];f.message.content='http://xbox.com/play/media/yBYtANeDZK';
+      const readScreenshot=async(_env,urls)=>{assert.deepEqual(urls,['https://xbox.com/play/media/yBYtANeDZK']);return readSample();};
+      const result=live?await handleLoadoutEvent(f.env,f.db,event,{fetchImpl:f.fetchImpl,readScreenshot})
+        :await scanLoadouts(f.env,f.db,{fetchImpl:f.fetchImpl,readScreenshot});
+      assert.equal(result.ok,true);assert.equal(f.posts.length,1);
+      assert.equal(f.sqlite.prepare('SELECT status FROM discord_loadout_submissions').get().status,'illegal');
+    }finally{f.sqlite.close();}
+  }
+});
+
+test('scheduled archetype and four-thread loadout scans complete with the real pacing coordinator',async()=>{
+  const f=await fixture(),original=globalThis.fetch;
+  try{
+    await f.save();
+    f.sqlite.exec(`INSERT INTO discord_coaching_settings(league_id,guild_id,enabled,source_channel_id,report_channel_id)
+      VALUES('a','${guild}',1,'${parent}','${parent}');`);
+    const extra=['200000000000000011','200000000000000012','200000000000000013'];
+    for(const [i,id] of extra.entries())f.sqlite.exec(`INSERT INTO discord_schedule_threads(id,league_id,snapshot_id,sync_run_id,discord_guild_id,parent_channel_id,discord_thread_id,game_external_id,season_year,week_index,home_team_key,away_team_key,status)
+      VALUES('extra-${i}','a','snapshot','sync','${guild}','${parent}','${id}','extra-${i}',2027,10,'tb','mia','active');`);
+    const code=(await readFile(`${ROOT}/workers/franchise-import-worker/src/discord-pacing.js`,'utf8'))
+      .replace("import { DurableObject } from 'cloudflare:workers';",'class DurableObject {}').replaceAll('export ','');
+    const context=vm.createContext({Date});vm.runInContext(`${code}\nglobalThis.update=updatePacing;`,context);
+    const state={};let rejected=0;
+    f.env.FRANCHISE_IMPORT_WORKER={async fetch(_url,options){
+      const result=context.update(state,JSON.parse(options.body));if(result.granted===false)rejected++;
+      return Response.json(result);
+    }};
+    globalThis.fetch=async(url,options)=>{
+      // Keep requests in flight across a task boundary, as real Discord does.
+      await new Promise(resolve=>setImmediate(resolve));
+      if(/\/channels\/\d+\/messages\?/.test(url))return Response.json([]);
+      let routed=String(url);for(const id of extra)routed=routed.replace(id,channel);
+      return f.fetchImpl(routed,options);
+    };
+    const response=await scannerEndpoint({env:{...f.env,DB:f.db},request:new Request('https://test/api/internal/coaching-scan',{
+      method:'POST',headers:{'x-fhq-coaching-scanner':f.env.COACHING_SCANNER_SECRET}})});
+    const result=await response.json();
+    assert.equal(result.archetypes.ok,true);assert.equal(result.loadouts.ok,true);assert.equal(rejected,0);
+    assert.equal(f.sqlite.prepare('SELECT count(*) n FROM discord_loadout_threads WHERE history_complete=1 AND last_scan_at IS NOT NULL').get().n,4);
+    assert.ok(f.sqlite.prepare('SELECT last_scan_at FROM discord_coaching_settings').get().last_scan_at);
+  }finally{globalThis.fetch=original;f.sqlite.close();}
 });
 
 test('history backfill maps the Discord author, posts in their matchup, and edits the report when rules change',async()=>{

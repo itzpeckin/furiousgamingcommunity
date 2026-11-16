@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.37",
+  "status": "validated-review-candidate",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "unregisteredFailures": 0,
+    "status": "passed"
+  },
+  "checks": {
+    "strictMigration": {
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false
+    },
+    "deliveryRegression": {
+      "passed": true,
+      "focusedTests": 59,
+      "realPacingCoordinator": true,
+      "httpXboxLiveAndRecovery": true,
+      "unsafeHostsRejected": true
+    },
+    "strictGate": {
+      "status": "passed",
+      "command": "node tools/run-quality.mjs --strict",
+      "tests": 719,
+      "failed": 0,
+      "releaseContract": "Required record headings corrected after initial gate; release contract rerun passed."
+    }
+  },
+  "scopeBoundaries": {
+    "databaseMigrationRequired": false,
+    "leagueRulesChanged": false,
+    "manualDiscordMessages": false,
+    "readerActivationVersion": "m27-glyph-reader-4",
+    "archivedThreadsRemainExcluded": true
+  }
+}
