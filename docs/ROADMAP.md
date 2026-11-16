@@ -8,11 +8,11 @@
 
 **Revision:** 3.12
 
-**Current production:** 8.2.36 console screenshot recognition; Pages deployment `e8a609b7-3e22-49d6-abb2-51cbc3bf366c` at Main commit `67145a3d977239ddcfbfde44248d778360c3cf71`.
+**Current production:** 8.2.37 Xbox link intake and scan delivery; Pages deployment `b8a8cd2e-162b-44f1-b50f-032e98f9e2fe` at Main commit `3f578da76cf3eda6bb202a6dd85595bce15c21ff`.
 
-**Current work:** 8.2.37 repairs ignored HTTP/bare Xbox share links and recovery scans that collide on shared Discord request limits. Shared intake validation and sequential history scans retain current-week and permission checks. The reported repost is in an archived week-19 matchup; the active snapshot is week 20 with no Tampa Bay matchup. See releases/8.2.37/release-record.md.
+**Current work:** 8.2.38 preserves completed screenshot checks when a submission cannot count for a matchup. Distinguish a missing team link from a linked owner posting in another matchup. Report-version refresh edits current reports using cached observations. The reported image was completely read; a wrong-thread override discarded the results before rendering. See releases/8.2.38/release-record.md.
 
-**Next gate:** Complete the strict and hosted checks, validate isolated preview, then deploy Pages and the matching scanner Worker. Observe successful automatic scans and report delivery for eligible current matchups. Billing and provider acceptance remain deferred.
+**Next gate:** Complete strict and hosted checks, validate isolated preview, deploy Pages, then verify the existing report updates through the normal scanner without another image read. No scanner Worker change is required. Billing and provider acceptance remain deferred.
 
 ## Product decisions
 

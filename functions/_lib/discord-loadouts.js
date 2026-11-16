@@ -8,13 +8,14 @@ import { ABILITY_BY_ID, LOADOUT_CATALOG } from './loadout-catalog.js';
 import { readLoadoutScreenshot, loadoutReaderReady as ready, LOADOUT_READER_VERSION } from './loadout-images.js';
 import { evaluateLoadout } from './loadout-rules.js';
 import { PLAYSHEET_BY_ID, PLAYSHEET_CATALOG } from './playsheet-catalog.js';
-import { loadoutReportLines } from './loadout-report.js';
+import { loadoutReportLines, LOADOUT_REPORT_VERSION } from './loadout-report.js';
 import { boundedMap } from './bounded-map.js';
 import { loadoutEmojiEnvironment } from './loadout-emojis.js';
 
 const rows=async(db,sql,...args)=>(await db.prepare(sql).bind(...args).all()).results||[];
 const snow=value=>/^\d{17,20}$/.test(String(value||''));
 const parse=(value,fallback=null)=>{try{return JSON.parse(value);}catch{return fallback;}};
+const needsReport=s=>['legal','illegal','unreadable','unassigned'].includes(s.status)&&parse(s.timings_json)?.reportVersion!==LOADOUT_REPORT_VERSION;
 const safe=value=>String(value||'').replace(/([\\*_~`|<>])/g,'\\$1').slice(0,100);
 const fail=message=>{throw Object.assign(new Error(message),{status:409});};
 
@@ -35,7 +36,7 @@ async function currentThreads(db,leagueId,guildId){
 export async function loadoutSettings(db,leagueId,env={}){
   const config=await db.prepare('SELECT * FROM discord_loadout_settings WHERE league_id=?').bind(leagueId).first();
   const threads=config?await currentThreads(db,leagueId,config.guild_id):[];
-  const current=threads.length?await rows(db,`SELECT status,rule_revision,reported_revision FROM discord_loadout_submissions
+  const current=threads.length?await rows(db,`SELECT status,rule_revision,reported_revision,timings_json FROM discord_loadout_submissions
     WHERE league_id=? AND thread_id IN (${threads.map(()=>'?').join(',')}) AND status<>'ignored'`,leagueId,...threads.map(t=>t.id)):[];
   const recovery=savedDiscordRecovery(config?.last_error,{stage:'history'});
   return {recovery,enabled:Boolean(config?.enabled),banned:parse(config?.banned_json,[]),bannedPlaysheets:parse(config?.banned_playsheets_json,[]),playsheetCatalog:PLAYSHEET_CATALOG,banDuplicates:Boolean(config?.ban_duplicates),
@@ -46,7 +47,7 @@ export async function loadoutSettings(db,leagueId,env={}){
       unreadable:current.filter(s=>s.status==='unreadable').length,
       unassigned:current.filter(s=>s.status==='unassigned').length,
       needsEvidence:current.filter(s=>s.status==='unreadable'||s.status==='unassigned').length,
-      reportsPending:current.filter(s=>s.status!=='pending'&&(s.rule_revision!==config?.revision||s.reported_revision!==config?.revision)).length}};
+      reportsPending:current.filter(s=>s.status!=='pending'&&(s.rule_revision!==config?.revision||s.reported_revision!==config?.revision||needsReport(s))).length}};
 }
 
 export async function configureLoadouts(c,body,{fetchImpl=fetch}={}){
@@ -139,8 +140,16 @@ async function processSubmission(env,db,config,thread,submission,fetchImpl,readS
     }
   }
   if(!result)result=evaluateLoadout(observed,{banned:parse(config.banned_json,[]),banDuplicates:Boolean(config.ban_duplicates),bannedPlaysheets:parse(config.banned_playsheets_json,[]),requirePlaysheets:true});
-  if(!['ignored','removed'].includes(result.status)&&(!team||![thread.home_team_key,thread.away_team_key].some(key=>resolveTeam(teams,key)?.teamKey===team)))
-    result={status:'unassigned',reason:'Link your Discord account and team in FHQ, then post your loadout in your own matchup thread.'};
+  if(!['ignored','removed'].includes(result.status)){
+    if(!team)result={...result,status:'unassigned',assignmentIssue:'missing-team',reason:'Link your Discord account and team in FHQ, then post your loadout in your own matchup thread. The screenshot checks below are not counted until your team is verified.'};
+    else if(![thread.home_team_key,thread.away_team_key].some(key=>resolveTeam(teams,key)?.teamKey===team)){
+      const name=key=>safe(resolveTeam(teams,key)?.displayName||key);
+      const ownThread=(await currentThreads(db,config.league_id,config.guild_id)).find(t=>[t.home_team_key,t.away_team_key].some(key=>resolveTeam(teams,key)?.teamKey===team));
+      const destination=ownThread&&snow(ownThread.discord_thread_id)?`Post in <#${ownThread.discord_thread_id}> to have it counted.`:`There is no active matchup for ${name(team)} in the current schedule.`;
+      // Assignment eligibility must not erase completed screenshot/rule checks.
+      result={...result,status:'unassigned',assignmentIssue:'wrong-thread',reason:`Your account is linked to ${name(team)}. This is the ${name(thread.away_team_key)} at ${name(thread.home_team_key)} matchup. ${destination} The screenshot checks below are not counted for this matchup.`};
+    }
+  }
   if(!await stillCurrent(db,config,thread))return;
   await db.prepare(`UPDATE discord_loadout_submissions SET team_key=?,observed_json=?,status=?,reason=?,rule_revision=?,checked_at=CURRENT_TIMESTAMP
     WHERE league_id=? AND thread_id=? AND message_id=?`).bind(team||null,observed?JSON.stringify(observed):null,result.status,result.reason,
@@ -150,7 +159,8 @@ async function processSubmission(env,db,config,thread,submission,fetchImpl,readS
       .bind(config.revision,config.league_id,thread.id,submission.message_id).run();return;
   }
   const marker=`loadout:${thread.discord_thread_id}:${submission.message_id}`;
-  const label={legal:'Legal',illegal:'Illegal',unreadable:'Clearer evidence needed',unassigned:'Team link needed'}[result.status];
+  const label=result.status==='unassigned'?(result.assignmentIssue==='wrong-thread'?'Wrong matchup thread':'Team link needed')
+    :{legal:'Legal',illegal:'Illegal',unreadable:'Clearer evidence needed'}[result.status];
   const body={content:`<@${submission.author_id}> · **${safe(resolveTeam(teams,team)?.displayName||'Team not verified')}** · **${label}**\n${result.reason}`,
     embeds:[{title:`Weekly loadout check · Week ${thread.week_index}`,description:loadoutReportLines(observed,result,emojiEnv),
       url:`https://discord.com/channels/${config.guild_id}/${thread.discord_thread_id}/${submission.message_id}`,
@@ -167,7 +177,7 @@ async function processSubmission(env,db,config,thread,submission,fetchImpl,readS
   catch(error){if(Number(error.status)!==404)throw error;}
   if(!posted)posted=await discordBotRequest(env,`/channels/${thread.discord_thread_id}/messages`,{method:'POST',body:{...body,nonce:submission.message_id,enforce_nonce:true},fetchImpl,rateLimitRetries:0,recoveryStage:'report'});
   const timings={discoveryMs:submission.discovered_at?Math.max(0,Date.parse(submission.discovered_at.replace(' ','T')+'Z')-Date.parse(submission.submitted_at)):null,
-    imageMs,postMs:Date.now()-posting,processingMs:Date.now()-started,totalMs:Math.max(0,Date.now()-Date.parse(submission.submitted_at)),readerPath:observed?.readerPath||'verified'};
+    imageMs,postMs:Date.now()-posting,processingMs:Date.now()-started,totalMs:Math.max(0,Date.now()-Date.parse(submission.submitted_at)),readerPath:observed?.readerPath||'verified',reportVersion:LOADOUT_REPORT_VERSION};
   await db.prepare('UPDATE discord_loadout_submissions SET report_message_id=?,reported_revision=?,reported_at=CURRENT_TIMESTAMP,timings_json=? WHERE league_id=? AND thread_id=? AND message_id=?')
     .bind(posted.id,config.revision,JSON.stringify(timings),config.league_id,thread.id,submission.message_id).run();
 }
@@ -201,7 +211,9 @@ async function processClaimed(env,db,config,thread,submission,fetchImpl,readScre
   }
 }
 
-const needsCheck=(s,c)=>s.status==='pending'||s.rule_revision!==c.revision||s.reported_revision!==c.revision||parse(s.observed_json)?.readerVersion&&parse(s.observed_json).readerVersion!==LOADOUT_READER_VERSION;
+const needsCheck=(s,c)=>s.status==='pending'||s.rule_revision!==c.revision||s.reported_revision!==c.revision
+  ||parse(s.observed_json)?.readerVersion&&parse(s.observed_json).readerVersion!==LOADOUT_READER_VERSION
+  ||needsReport(s);
 
 export async function handleLoadoutEvent(env,db,event,{fetchImpl=fetch,readScreenshot=readLoadoutScreenshot}={}){
   if(!ready(env)||![event.guildId,event.channelId,event.messageId].every(snow))return {ok:true,ignored:true};
@@ -266,8 +278,9 @@ export async function scanLoadouts(env,db,{fetchImpl=fetch,readScreenshot=readLo
         AND (processing_until IS NULL OR julianday(processing_until)<julianday('now'))
         AND (status='pending' OR rule_revision<>? OR reported_revision<>?
           OR (status IN ('legal','illegal','unreadable','ignored','unassigned') AND json_extract(observed_json,'$.readerVersion') IS NOT NULL
-            AND json_extract(observed_json,'$.readerVersion')<>?)) ORDER BY attempts ASC,submitted_at DESC LIMIT 3`,
-        config.league_id,...threads.map(t=>t.id),config.revision,config.revision,LOADOUT_READER_VERSION);
+            AND json_extract(observed_json,'$.readerVersion')<>?)
+          OR (status IN ('legal','illegal','unreadable','unassigned') AND COALESCE(json_extract(timings_json,'$.reportVersion'),'')<>?)) ORDER BY attempts ASC,submitted_at DESC LIMIT 3`,
+        config.league_id,...threads.map(t=>t.id),config.revision,config.revision,LOADOUT_READER_VERSION,LOADOUT_REPORT_VERSION);
       const results=await boundedMap(submissions,3,s=>processClaimed(env,db,config,threads.find(t=>t.id===s.thread_id),s,fetchImpl,readScreenshot));
       const failed=results.find(r=>!r.ok);
       if(failed)throw Object.assign(new Error('Check will retry.'),{safeRecovery:failed.recovery});
