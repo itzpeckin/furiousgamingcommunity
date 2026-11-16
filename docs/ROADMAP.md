@@ -4,13 +4,13 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** November 11, 2026
+**Updated:** November 16, 2026
 
 **Revision:** 3.12
 
 **Current production:** 8.2.35 public league startup and roster access; Pages deployment `85b856a2-96e6-455b-8ce2-d7a81507b1e1` at exact Main commit `597dd8d56ebdc358fb1bdbbb2e3fe2d14fda56ee`.
 
-**Current work:** 8.2.35 repairs a visitor startup race that can leave only the public league banner visible. Synchronous tenant metadata, one canonical tenant-resolution event, visible home loading and direct roster entry are in scope. Billing, provider acceptance and weekly loadout recognition remain deferred.
+**Current work:** 8.2.36 fixes weekly loadout recognition for clear console screenshots with unchecked icons. Preserve label-verified console row geometry when the fast path needs independent glyph confirmation. The supplied Xbox capture now identifies all six abilities and four playsheets with live Workers AI. Strict/hosted gates and publication are pending; see releases/8.2.36/release-record.md. Billing and provider acceptance remain deferred.
 
 **Next gate:** Obtain owner confirmation from the affected visitor. The 8.2.35 deployment, all Main checks and signed-out live acceptance passed: desktop home, mobile Browse rosters with all 32 teams, the Buccaneers’ 62-player roster, direct team refresh and Tristan Wirfs’s public player details. All 714 strict tests, local phone/desktop acceptance, 38 focused regressions, three hosted checks and isolated-preview HTTP checks passed. Hosted preview browser navigation redirects to production; no hosted preview roster-browser pass is claimed. The existing import-performance and provider acceptance work in docs/8.2-reliability-review.md remains open.
 

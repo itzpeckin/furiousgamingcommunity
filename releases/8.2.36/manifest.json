@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.36",
+  "releaseType": "console-loadout-recognition-fix",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "tag": "commit:9103c9217ed701016fcaa2937995ee16446151f8",
+    "commit": "9103c9217ed701016fcaa2937995ee16446151f8"
+  },
+  "implementationBranch": "fix/coach-screenshot-reading",
+  "knownInheritedIssues": [],
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "authorization": "Requested Discord screenshot fix under the standing release authorization recorded in RELEASE-PROCESS.md.",
+    "currentRelease": "8.2.35",
+    "candidateRelease": "8.2.36",
+    "currentMigration": 56,
+    "candidateMigration": 56
+  },
+  "requiredArtifacts": [
+    "releases/8.2.36/release-record.md",
+    "releases/8.2.36/validation-evidence.json",
+    "releases/8.2.36/recovery-plan.md"
+  ]
+}
