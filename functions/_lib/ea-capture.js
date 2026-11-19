@@ -183,13 +183,20 @@ async function scopedSeason(db, leagueId, hub, externalLeagueId) {
       .bind(leagueId,text(externalLeagueId),hub.gameRelease).all();
     const next=prepared.results?.length===1?prepared.results[0]:null;
     const preparedAhead=next && hub.seasonYear!==null && Number(next.season_year)>hub.seasonYear;
+    const preparedBehind=next && hub.seasonYear!==null && Number(next.season_year)<hub.seasonYear;
+    const advanceGuidance=hub.currentPeriod.stage==='offseason'
+      ? `In the connected Madden franchise, complete the remaining ${hub.seasonYear} offseason stages and advance to the ${Number(next?.season_year)} preseason.`
+      : 'Check the season in the connected Madden franchise and finish its advance.';
     const message=preparedAhead
-      ? `FHQ has already prepared season ${Number(next.season_year)}, but EA is still reporting season ${hub.seasonYear}. Your archive is safe. After Madden finishes advancing, retry the EA export in Command Center → Madden Import. Do not archive again or disconnect EA. If this repeats, contact support with the export reference.`
+      ? `FHQ has already prepared season ${Number(next.season_year)}, but EA is reporting season ${hub.seasonYear}${hub.currentPeriod.stage==='offseason'?`, Offseason Week ${hub.currentPeriod.week}`:''}. Archiving in FHQ does not advance Madden. ${advanceGuidance} Once Madden shows ${Number(next.season_year)} and has finished advancing, open Command Center → Madden Import → EA Direct and select Import Season Schedule in Step 2. Do not archive again or disconnect EA. If Madden already shows ${Number(next.season_year)} and this repeats, share the export reference with support.`
+      : preparedBehind
+        ? `EA reports season ${hub.seasonYear}, but FHQ’s prepared season is ${Number(next.season_year)}. In Commish HQ → Command Center, verify that the ${Number(next.season_year)} season is complete and use Archive Season once to prepare the next season. Then return to Madden Import → EA Direct and select Import Season Schedule in Step 2.`
       : 'EA’s franchise, season, and Madden edition do not match a prepared season in FHQ. Open Commish HQ → Command Center and check the season. Use Archive Season only if the next season has not already been prepared. Reconnecting EA will not fix a season mismatch.';
     const error=new EaClientError('EA_SEASON_MISMATCH',message,{status:409});
     error.seasonDiagnostic={reportedYear:hub.seasonYear,preparedYear:next?Number(next.season_year):null,
       sourceSeasonIdPresent:Boolean(hub.sourceSeasonId),matchingSeasonCount:rows.results?.length||0,
-      preparedSeasonCount:prepared.results?.length||0,stage:hub.currentPeriod.stage,week:hub.currentPeriod.week};
+      preparedSeasonCount:prepared.results?.length||0,stage:hub.currentPeriod.stage,week:hub.currentPeriod.week,
+      reason:preparedAhead?'prepared-season-ahead':preparedBehind?'archive-required':!prepared.results?.length?'prepared-season-unavailable':prepared.results.length>1?'prepared-season-ambiguous':'season-identity-mismatch'};
     throw error;
   }
   return row;

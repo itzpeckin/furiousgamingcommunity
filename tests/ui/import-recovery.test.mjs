@@ -19,6 +19,43 @@ function harness(handler){
 }
 const readiness=()=>Response.json({source:{sourceFingerprint:'source-1'},destination:{id:'destination-1'},run:null});
 
+test('season mismatch recovery explains schedule and update steps instead of retrying the old export',async()=>{
+  const ui=harness(async()=>readiness());await ui.service.refresh();
+  const outcome=ui.service.failureGuidance({code:'EA_SEASON_MISMATCH',message:'FHQ prepared 2029; EA reports 2028.'},'analyze-source');
+  assert.equal(outcome.button,'refresh');
+  assert.match(outcome.summary,/2029.*2028/);
+  assert.match(outcome.action,/Import Season Schedule in Step 2/);
+  assert.match(outcome.action,/If Madden has advanced but FHQ has not, verify the completed FHQ season and use Archive Season once/);
+  assert.match(outcome.action,/If FHQ already prepared the new year, do not archive again/);
+  assert.doesNotMatch(outcome.action,/Retry the retained export/);
+});
+
+test('archive cards distinguish prepared 2029 from imported 2028 and refresh after publication',async()=>{
+  let service;
+  let payload={gameYear:{id:'madden-27',displayName:'Madden NFL 27',status:'active'},preservedDomains:[],
+    franchiseSeasons:[{id:'2029',seasonYear:2029,status:'preview'},{id:'2028',seasonYear:2028,status:'closed'}]};
+  const events={};
+  const window={FranchiseHQ:{leagueTenant:{getCurrentLeague:()=>({slug:'alpha'})},
+    defineModuleService:(_scope,_id,value)=>{service=value;}},addEventListener:(name,callback)=>{events[name]=callback;}};
+  vm.runInNewContext(await readFile(new URL('../../league-engine/game-year-transition.js',import.meta.url),'utf8'),{
+    window,document:{querySelectorAll:()=>[],addEventListener(){}},setTimeout:()=>0,
+    fetch:async()=>({ok:true,json:async()=>payload})
+  });
+  await service.refresh();
+  for(const markup of [service.renderArchivePanel(),service.renderPanel()]){
+    assert.match(markup,/2029 prepared/);
+    assert.match(markup,/2028 is archived in History Books/);
+    assert.match(markup,/previous imported data stays visible/);
+    assert.match(markup,/Import Season Schedule in Step 2/);
+    assert.match(markup,/data-game-year-archive-season disabled/);
+    assert.match(markup,/Awaiting 2029 Import/);
+  }
+  payload={...payload,franchiseSeasons:[{id:'2029',seasonYear:2029,status:'active',displayName:'Season 2029'},payload.franchiseSeasons[1]]};
+  await events['franchisehq:league-import-live']();
+  assert.doesNotMatch(service.renderArchivePanel(),/Awaiting 2029 Import|data-game-year-archive-season disabled/);
+  assert.match(service.renderArchivePanel(),/Freeze Season 2029/);
+});
+
 test('readiness failures offer another read, never retrying an import or collecting another export',async()=>{
   let interrupted=true;
   const ui=harness(async()=>interrupted?Response.json({ok:false,error:'Service unavailable'},{status:503}):readiness());

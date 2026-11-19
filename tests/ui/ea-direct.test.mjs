@@ -78,6 +78,75 @@ const connected = (overrides = {}) => ({
 });
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
+test('archived 2028 awaiting 2029 gives Madden offseason steps and safe support details',async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{
+    id:'yearly-2029',mode:'yearly',status:'failed',code:'EA_SEASON_MISMATCH',
+    message:'An internal season diagnostic must not replace commissioner guidance.',
+    seasonDiagnostic:{reportedYear:2028,preparedYear:2029,stage:'offseason',week:16,
+      reason:'prepared-season-ahead',privateToken:'do-not-display'}
+  }});
+  await ui.service.refresh();
+  const card=ui.markup().split('<section class="ea-direct-recovery"')[1].split('</section>')[0];
+  assert.match(card,/2029 is prepared; EA reports 2028/);
+  assert.match(card,/2028 offseason/);
+  assert.match(card,/Archiving in FHQ does not advance the season in Madden/);
+  assert.match(card,/advance to 2029 preseason/);
+  assert.match(card,/Import Season Schedule in Step 2/);
+  assert.match(card,/Collect League Update in Step 3/);
+  assert.match(card,/Do not archive again, change the season number, or reconnect EA/);
+  assert.match(card,/Prepared season: 2029/);
+  assert.match(card,/EA reported season: 2028/);
+  assert.match(card,/EA phase: offseason/);
+  assert.doesNotMatch(card,/do-not-display|privateToken|internal season diagnostic|data-ea-action="retry-collection"/);
+  ui.click({eaAction:'schedule'});await settle();
+  assert.ok(ui.requests.every(request=>request.options.method==='GET'),'guidance does not start another collection or change the season');
+});
+
+test('season mismatch without diagnostics still explains the commissioner workflow without inventing years',async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{
+    id:'yearly-unknown',mode:'yearly',status:'failed',code:'EA_SEASON_MISMATCH',message:'EA and FHQ seasons do not match.'
+  }});
+  await ui.service.refresh();
+  const card=ui.markup().split('<section class="ea-direct-recovery"')[1].split('</section>')[0];
+  assert.match(card,/What the commissioner should do/);
+  assert.match(card,/Check the connected franchise, year and phase/);
+  assert.match(card,/Import Season Schedule in Step 2/);
+  assert.doesNotMatch(card,/2028|2029|NaN/);
+});
+
+test('Madden ahead of FHQ directs one verified archive before collecting the new schedule',async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{
+    id:'archive-required',mode:'yearly',status:'failed',code:'EA_SEASON_MISMATCH',
+    message:'EA reports 2029; FHQ has 2028.',
+    seasonDiagnostic:{reportedYear:2029,preparedYear:2028,stage:'preseason',week:1,reason:'archive-required'}
+  }});
+  await ui.service.refresh();
+  const card=ui.markup().split('<section class="ea-direct-recovery"')[1].split('</section>')[0];
+  assert.match(card,/Archive the completed FHQ season/);
+  assert.match(card,/verify that 2028 is complete, then use Archive Season once/);
+  assert.match(card,/Import Season Schedule in Step 2/);
+  assert.match(card,/data-ea-action="archive"/);
+  assert.doesNotMatch(card,/Finish the remaining|Do not archive again, change the season/);
+  ui.click({eaAction:'archive'});await settle();
+  assert.equal(ui.effects().scrolled,1);
+  assert.ok(ui.requests.every(request=>request.options.method==='GET'),'reviewing archive does not perform the archive');
+});
+
+test('prepared season ahead during regular play does not invent an offseason phase',async()=>{
+  const ui=harness();
+  ui.respond(async path=>path.endsWith('/connection')?connected():{job:{
+    id:'regular-mismatch',mode:'yearly',status:'failed',code:'EA_SEASON_MISMATCH',
+    seasonDiagnostic:{reportedYear:2028,preparedYear:2029,stage:'regular-season',week:18,reason:'prepared-season-ahead'}
+  }});
+  await ui.service.refresh();
+  const card=ui.markup().split('<section class="ea-direct-recovery"')[1].split('</section>')[0];
+  assert.match(card,/check its year and phase/);
+  assert.doesNotMatch(card,/remaining 2028 offseason|advance to 2029 preseason/);
+});
+
 for (const [status,code,title,action] of [
   [401,'HTTP_401','Sign back into FHQ','sign-in'],
   [403,'HTTP_403','Commissioner access required',null],

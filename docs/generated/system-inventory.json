@@ -344,7 +344,7 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 57268,
+        "bytes": 58011,
         "file": "league-engine/one-click-import.js"
       },
       {
@@ -352,12 +352,12 @@
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
-        "bytes": 46837,
-        "file": "tests/import/game-year-transition.test.mjs"
+        "bytes": 49866,
+        "file": "tests/import/ea-capture.test.mjs"
       },
       {
-        "bytes": 46772,
-        "file": "tests/import/ea-capture.test.mjs"
+        "bytes": 46837,
+        "file": "tests/import/game-year-transition.test.mjs"
       }
     ],
     "total": 890
@@ -1997,7 +1997,7 @@
     }
   ],
   "product": "FranchiseHQ",
-  "release": "8.2.38",
+  "release": "8.2.39",
   "schemaVersion": 1,
   "scope": {
     "excludedPrefixes": [

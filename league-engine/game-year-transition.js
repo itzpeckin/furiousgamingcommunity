@@ -96,13 +96,26 @@
   async function archiveSeason() {
     await runAction('archive-franchise-season');
     if(!errorMessage){
-      notice='Season archived in History Books. The next franchise season is ready for its Week 1 export.';
+      notice=`${state?.result?.alreadyPrepared?'The next season is already prepared.':'Season archived in History Books.'} Import the new season schedule in Step 2, then collect and import the league update.`;
       window.dispatchEvent(new CustomEvent('franchisehq:franchise-season-archived',{detail:state?.result||{}}));
       rerender();
     }
   }
 
   function count(value) { return Number(value || 0).toLocaleString(); }
+  function archiveSeasonState() {
+    const seasons=state?.franchiseSeasons||[];
+    const season=seasons.find(item=>['active','preview'].includes(item.status))||seasons[0];
+    const awaitingImport=season?.status==='preview';
+    const year=season?.seasonYear;
+    const previous=seasons.find(item=>['closed','archived'].includes(item.status)&&Number(item.seasonYear)<Number(year));
+    return {season,awaitingImport,
+      title:awaitingImport?`${year||'Next season'} prepared`:'Archive Season',
+      description:awaitingImport
+        ? `${previous?`${previous.seasonYear} is archived in History Books. `:''}${year||'The next season'} is prepared in FHQ and awaits its first live import. The previous imported data stays visible until that succeeds. Use Import Season Schedule in Step 2, then Collect League Update, Refresh, and Import Latest Export. Do not archive again.`
+        : `Freeze ${season?.displayName||'the completed franchise season'} into league history and prepare the next season in one protected action.`,
+      button:awaitingImport?`Awaiting ${year||'Season'} Import`:'Archive Season'};
+  }
   function statusTone(status) {
     if (['active','restored','archive-verified','completed'].includes(status)) return 'success';
     if (['failed','archive-removed'].includes(status)) return 'danger';
@@ -143,13 +156,13 @@
     const expected=action?.expected||currentExpected();
     const freeAgents=state.freeAgents||{status:'missing',count:null};
     const canRollback=['archive-verified','detached','active-data-removed','restoring'].includes(transition?.status);
-    const activeSeason=state.franchiseSeasons?.find(season=>['active','preview'].includes(season.status))||state.franchiseSeasons?.[0];
+    const archiveState=archiveSeasonState();
     return `<section class="game-year-transition-stack" data-game-year-transition-panel>
       <article class="card game-year-transition-card">
         <div class="card-header"><div><span class="eyebrow">v${VERSION} · Madden edition boundary</span><h3>${esc(gameYear.displayName)}</h3><p>A Madden game year can contain several franchise seasons. League accounts, memberships, roles, sessions, settings, rules, audits, stable player identities, and GM history persist across every operation.</p></div><span class="pill pill--${statusTone(gameYear.status)}">${esc(gameYear.status)}</span></div>
         <div class="game-year-operation-grid">
           <section><span class="eyebrow">Same edition</span><h4>Latest League Export</h4><p>The permanent league URL receives each ${esc(gameYear.gameRelease)} export. One Import action validates and publishes the newest eligible revision live.</p><button class="button button--ghost" data-game-year-replace ${busy?'disabled':''}>Open Import</button></section>
-          <section><span class="eyebrow">Same edition</span><h4>Archive Season</h4><p>One click freezes ${esc(activeSeason?.displayName||'the completed season')} into History Books and prepares the next franchise season. Then run the Week 1 export and select Import once.</p><button class="button button--primary" data-game-year-archive-season ${busy?'disabled':''}>${busy?'Working…':'Archive Season'}</button></section>
+          <section><span class="eyebrow">Same edition</span><h4>${esc(archiveState.title)}</h4><p>${esc(archiveState.description)}</p><button class="button button--primary" data-game-year-archive-season ${busy||archiveState.awaitingImport?'disabled':''}>${busy?'Working…':esc(archiveState.button)}</button></section>
         </div>
       </article>
       <article class="card game-year-transition-card game-year-transition-card--danger">
@@ -172,9 +185,9 @@
   function renderArchivePanel() {
     if (!state) return `<section class="commissioner-archive-card" data-game-year-transition-panel data-game-year-archive-panel><div><span class="eyebrow">Season history</span><h2>Archive Season</h2><p>Loading the active franchise season…</p></div><button class="button button--primary" disabled>Loading…</button></section>`;
     const gameYear=state.gameYear;
-    const activeSeason=state.franchiseSeasons?.find(season=>['active','preview'].includes(season.status))||state.franchiseSeasons?.[0];
+    const archiveState=archiveSeasonState();
     if(!gameYear)return `<section class="commissioner-archive-card" data-game-year-transition-panel data-game-year-archive-panel><div><span class="eyebrow">Season history</span><h2>Archive Season</h2><p>Create an active Madden franchise season before archiving.</p></div><button class="button button--primary" disabled>Unavailable</button></section>`;
-    return `<section class="commissioner-archive-card" data-game-year-transition-panel data-game-year-archive-panel><div class="commissioner-archive-card__icon"><svg><use href="#icon-trophy"></use></svg></div><div><span class="eyebrow">History Books</span><h2>Archive Season</h2><p>Freeze ${esc(activeSeason?.displayName||'the completed franchise season')} into league history and prepare the next season in one protected action.</p>${errorMessage?`<small class="is-error">${esc(errorMessage)}</small>`:notice?`<small>${esc(notice)}</small>`:''}</div><button class="button button--primary" data-game-year-archive-season ${busy?'disabled':''}>${busy?'Archiving…':'Archive Season'}</button></section>`;
+    return `<section class="commissioner-archive-card" data-game-year-transition-panel data-game-year-archive-panel><div class="commissioner-archive-card__icon"><svg><use href="#icon-trophy"></use></svg></div><div><span class="eyebrow">History Books</span><h2>${esc(archiveState.title)}</h2><p>${esc(archiveState.description)}</p>${errorMessage?`<small class="is-error">${esc(errorMessage)}</small>`:notice?`<small>${esc(notice)}</small>`:''}</div><button class="button button--primary" data-game-year-archive-season ${busy||archiveState.awaitingImport?'disabled':''}>${busy?'Archiving…':esc(archiveState.button)}</button></section>`;
   }
 
   function rerender() {
@@ -202,6 +215,7 @@
   });
 
   if(!HQ?.defineModuleService)throw new Error('platform/core.js must load before game-year-transition.js.');
+  window.addEventListener('franchisehq:league-import-live',()=>refresh().catch(()=>{}));
   HQ.defineModuleService('platform','gameYearTransition',{refresh,renderPanel,renderArchivePanel,diagnostics:()=>({release:VERSION,busy,state,error:errorMessage})},{replace:true,alias:'gameYearTransition'});
   HQ.manifest?.register?.({scope:'module',module:'platform',id:'game-year-transition',service:'gameYearTransition',script:'league-engine/game-year-transition.js',version:VERSION,dependencies:['auth','leagueTenant'],capabilities:['game-year-boundary','one-click-franchise-season-archive','immutable-history','recovery-bookmark','no-free-agent-zero-default']});
   setTimeout(()=>refresh().catch(()=>{}),0);
