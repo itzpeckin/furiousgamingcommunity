@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "product": "FranchiseHQ",
+  "version": "8.2.39",
+  "releaseType": "season-rollover-guidance-fix",
+  "status": "validated-review-candidate",
+  "sourceBaseline": {
+    "tag": "v8.2.38",
+    "commit": "8f9bff5b71a342ae3d628e3eb68640f48d6ee3ce"
+  },
+  "implementationBranch": "codex/fix-2029-season-rollover",
+  "knownInheritedIssues": [],
+  "production": {
+    "authorized": true,
+    "deployed": false,
+    "authorization": "Owner requested the live 2028 archive/2029 season update repair and clearer commissioner recovery instructions.",
+    "currentRelease": "8.2.38",
+    "candidateRelease": "8.2.39",
+    "currentMigration": 56,
+    "candidateMigration": 56
+  },
+  "requiredArtifacts": [
+    "releases/8.2.39/release-record.md",
+    "releases/8.2.39/validation-evidence.json",
+    "releases/8.2.39/recovery-plan.md"
+  ]
+}

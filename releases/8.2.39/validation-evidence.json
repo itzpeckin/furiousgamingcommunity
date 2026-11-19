@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "version": "8.2.39",
+  "status": "validated-review-candidate",
+  "evidenceScope": "Application release candidate only; the normal authorized live archive/2029 collection/publication operations are recorded separately under incidentDiagnosis and authorizedLiveOperations. Application dataChanged=false does not assert that no live operation wrote data.",
+  "productionChanged": false,
+  "dataChanged": false,
+  "credentialsChanged": false,
+  "baselineGate": {
+    "status": "passed",
+    "unregisteredFailures": 0
+  },
+  "checks": {
+    "strictMigration": {
+      "status": "passed",
+      "passed": true,
+      "expectedFailure": false,
+      "migrationVersion": 56,
+      "candidateRequiresMigration": false,
+      "canonicalMigrations": 39,
+      "archivedLegacyFiles": 19,
+      "requiredTables": 142
+    },
+    "seasonRolloverRegression": {
+      "status": "passed",
+      "passed": true,
+      "tests": 83,
+      "failed": 0,
+      "scope": "Focused backend season rollover regressions"
+    },
+    "commissionerGuidanceRegression": {
+      "status": "passed",
+      "passed": true,
+      "tests": 120,
+      "failed": 0,
+      "frontendTests": 63,
+      "relatedTests": 57,
+      "scope": "Focused commissioner UI and related regressions"
+    },
+    "strictGate": {
+      "status": "passed",
+      "passed": true,
+      "command": "node tools/run-quality.mjs --strict",
+      "tests": 730,
+      "failed": 0,
+      "log": "/private/tmp/fhq-2029-quality-final.log",
+      "inventoryPassed": true,
+      "migrationPassed": true,
+      "releaseContractPassed": true
+    },
+    "releaseContract": {
+      "status": "passed",
+      "command": "node tools/check-release.mjs"
+    },
+    "environmentContract": {
+      "status": "passed",
+      "command": "node tools/check-environment-contract.mjs"
+    }
+  },
+  "incidentDiagnosis": {
+    "archive2028": {
+      "status": "preserved-after-2029-activation",
+      "closedAtUtc": "2026-11-19 03:56:52",
+      "playerSummaries": 2579,
+      "gmSummaries": 36,
+      "teamAssignmentsCarried": 32,
+      "digest": "8ba04c2e499db1cd0f7256a4a54bf910d237c12deb5559e79488b5a95b6bbb8a",
+      "digestUnchanged": true,
+      "ownershipPeriods": 38
+    },
+    "prepared2029": {
+      "status": "active",
+      "sourceSeasonId": 4
+    },
+    "live2029ScheduleAndSeasonUpdate": "completed-and-live-activation-verified",
+    "initialYearlyAttempt": {
+      "status": "failed",
+      "code": "EA_SEASON_MISMATCH",
+      "eaSeasonYear": 2028,
+      "eaPhase": "offseason",
+      "eaSourceSeasonId": null,
+      "eaWeek": 16
+    },
+    "freshYearlyAttempt": {
+      "status": "completed",
+      "jobId": "eaj_d102f246-717f-4bc9-92ba-05edbd6b031a",
+      "passedSeasonGuard": true,
+      "sourceSeasonId": 4,
+      "seasonYear": 2029,
+      "currentPeriod": {
+        "stage": "preseason",
+        "week": 1
+      },
+      "completedWeeks": 18,
+      "games": 272,
+      "rostersComplete": true,
+      "freeAgentsLocated": 1121,
+      "retainedCaptures": 54,
+      "acceptedCaptures": 54
+    },
+    "recurrenceRecoveryGuidance": "Advance the same Madden franchise into the 2029 preseason, then run Import Season Schedule. If Madden already shows 2029, retry Import Season Schedule once; if EA still returns 2028, contact support with the error details.",
+    "nextAction": "Continue normal 2029 league operations; the requested season and schedule import is live."
+  },
+  "scopeBoundaries": {
+    "databaseMigrationRequired": false,
+    "closedSeasonProtectionPreserved": true,
+    "sourceSeasonIdentityMustBeVerified": true,
+    "archiveReplayRequired": false,
+    "credentialsChanged": false,
+    "discordChanged": false
+  },
+  "external": {
+    "hostedChecks": {
+      "status": "not-run"
+    },
+    "productionDeployment": {
+      "status": "not-run"
+    },
+    "live2029Acceptance": {
+      "status": "passed",
+      "snapshotId": "2eaed956-20be-45cb-90ae-4c20e54a304b",
+      "seasonYear": 2029,
+      "weekIndex": 1,
+      "games": 272,
+      "players": 2941,
+      "archive2028Preserved": true
+    },
+    "deploymentConfiguration": {
+      "status": "prepared",
+      "APP_VERSION": "8.2.39",
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "applicationDeploymentCompleted": false
+    }
+  },
+  "authorizedLiveOperations": {
+    "authorized": true,
+    "scope": "Normal commissioner operations requested by the user, separate from application deployment",
+    "yearlyCollection": {
+      "status": "completed",
+      "jobId": "eaj_d102f246-717f-4bc9-92ba-05edbd6b031a"
+    },
+    "publication": {
+      "status": "completed",
+      "workflowId": "fhq-e11a027cd79b8cc0aa3be54a"
+    },
+    "liveActivation": "verified",
+    "dataWritesOccurred": true,
+    "validatedCandidate": {
+      "snapshotId": "2eaed956-20be-45cb-90ae-4c20e54a304b",
+      "seasonYear": 2029,
+      "games": 272,
+      "players": 2941,
+      "statistics": 0,
+      "phase": "preseason",
+      "status": "active",
+      "activated": true,
+      "weekIndex": 1,
+      "candidateImportId": "candidate_import_cbbe66ec-baf4-451c-886c-9395a010989a",
+      "activeSnapshotIdAfter": "2eaed956-20be-45cb-90ae-4c20e54a304b"
+    },
+    "seasonStates": {
+      "2028": "closed",
+      "2029": "active"
+    }
+  }
+}

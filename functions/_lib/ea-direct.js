@@ -48,12 +48,24 @@ export async function openEa(env,scope,value){
     return JSON.parse(new TextDecoder().decode(plaintext));
   }catch{fail('CREDENTIAL_UNAVAILABLE','The saved EA connection cannot be opened. Reconnect your EA account.');}
 }
+export function publicEaSeasonDiagnostic(value){
+  if(!value||typeof value!=='object'||Array.isArray(value))return null;
+  const bounded=(entry,min,max)=>Number.isInteger(entry)&&entry>=min&&entry<=max?entry:null;
+  const stages=['preseason','regular-season','playoffs','offseason'];
+  const reasons=['prepared-season-ahead','archive-required','season-identity-mismatch','prepared-season-unavailable','prepared-season-ambiguous'];
+  return{reportedYear:bounded(value.reportedYear,1900,9999),preparedYear:bounded(value.preparedYear,1900,9999),
+    stage:stages.includes(value.stage)?value.stage:null,week:bounded(value.week,1,40),
+    reason:reasons.includes(value.reason)?value.reason:null,
+    sourceSeasonIdPresent:value.sourceSeasonIdPresent===true,
+    matchingSeasonCount:bounded(value.matchingSeasonCount,0,2),preparedSeasonCount:bounded(value.preparedSeasonCount,0,2)};
+}
 export function safeEaError(error){
   if(error instanceof EaDirectError || error instanceof EaClientError){
     const diagnostic=safeEaClientDiagnostic(error);
+    const seasonDiagnostic=error.code==='EA_SEASON_MISMATCH'?publicEaSeasonDiagnostic(error.seasonDiagnostic):null;
     const detail=diagnostic ? ` Failed step: ${diagnostic.stepLabel}${diagnostic.httpStatus ? ` (EA HTTP ${diagnostic.httpStatus})` : ''}${diagnostic.providerCode ? `; ${diagnostic.providerCode}` : ''}.` : '';
     const guidance=error.code==='EA_RECONNECT_REQUIRED'?' Open Command Center → Madden Import → EA Direct, then select Reconnect EA Account to sign in again. Your imported schedule and league data remain available.':'';
-    return{code:error.code||'EA_UNAVAILABLE',message:error.message+detail+guidance,status:error.status===401?409:Math.min(499,Math.max(400,Number(error.status)||424)),retryable:Boolean(error.retryable),...(diagnostic?{diagnostic}:{})};
+    return{code:error.code||'EA_UNAVAILABLE',message:error.message+detail+guidance,status:error.status===401?409:Math.min(499,Math.max(400,Number(error.status)||424)),retryable:Boolean(error.retryable),...(diagnostic?{diagnostic}:{}),...(seasonDiagnostic?{seasonDiagnostic}:{})};
   }
   return{code:'EA_CONNECTION_FAILED',message:'EA Direct could not finish this step. Check collection status before trying again. If the issue continues, share the collection ID with FHQ support. Reconnecting is not indicated by this error.',status:424,retryable:true};
 }
@@ -64,7 +76,7 @@ export function eaErrorResponse(error){
   // request/response, URLs, account identifiers, headers, or credentials.
   if(referenceId)console.warn(JSON.stringify({event:'ea-direct-request-failed',referenceId,...safe.diagnostic}));
   const message=safe.message+(referenceId?` Support reference: ${referenceId}.`:'');
-  return json({ok:false,error:message,message,code:safe.code,retryable:safe.retryable,...(referenceId?{diagnostic:safe.diagnostic,referenceId}:{})},safe.status);
+  return json({ok:false,error:message,message,code:safe.code,retryable:safe.retryable,...(referenceId?{diagnostic:safe.diagnostic,referenceId}:{}),...(safe.seasonDiagnostic?{seasonDiagnostic:safe.seasonDiagnostic}:{})},safe.status);
 }
 export function publicConnection(row){return row?{id:row.id,platform:row.platform,personaName:row.persona_name,leagueName:row.external_league_name,externalLeagueId:row.external_league_id,lastSyncedAt:row.last_synced_at,previewVerified:Boolean(row.preview_verified)}:null;}
 export async function activeEaConnection(db,leagueId){return db.prepare(`SELECT * FROM ea_direct_connections WHERE league_id=? AND status!='disconnected' LIMIT 1`).bind(leagueId).first();}

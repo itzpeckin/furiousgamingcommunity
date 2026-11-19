@@ -653,6 +653,43 @@ test('archived EA season gets actionable guidance and a verified preseason succe
   }finally{f.sqlite.close();}
 });
 
+test('2028 archive preserves history while calendar-only offseason waits for the verified 2029 season',async()=>{
+  const f=await fixture();try{
+    f.sqlite.exec(`UPDATE franchise_seasons SET season_year=2028,source_season_id='3',status='closed' WHERE id='ea-season';
+      INSERT INTO franchise_seasons(id,league_id,source_system,source_franchise_id,source_season_id,game_release,display_name,season_year,status)
+      VALUES('season-2029','ea-test','ea-madden-companion','1234','4','Madden NFL 27','2029',2029,'preview');
+      INSERT INTO game_year_franchise_seasons(game_year_id,league_id,franchise_season_id) VALUES('ea-year','ea-test','season-2029');
+      INSERT INTO league_snapshots(id,league_id,status,season_year,week_index,manifest_json) VALUES('archived-2028','ea-test','active',2028,23,'{}');
+      INSERT INTO league_active_snapshots(league_id,snapshot_id) VALUES('ea-test','archived-2028');`);
+    const options={db:f.db,bucket:f.bucket,league:f.league,actorId:'actor',platform:'ps5',externalLeagueId:'1234',mode:'yearly',connectionId:'connection-1'};
+    const hub=offseasonHub(15);hub.careerHubInfo.seasonInfo.calendarYear=2028;
+    const sessionsBefore=f.sqlite.prepare('SELECT COUNT(*) n FROM madden_discovery_sessions').get().n;
+    const objectsBefore=f.objects.size;
+    await assert.rejects(beginEaCapture({...options,collectionId:'waiting-2029',hub}),error=>{
+      const safe=safeEaError(error);
+      assert.equal(safe.code,'EA_SEASON_MISMATCH');
+      assert.deepEqual(safe.seasonDiagnostic,{reportedYear:2028,preparedYear:2029,stage:'offseason',week:16,
+        reason:'prepared-season-ahead',sourceSeasonIdPresent:false,matchingSeasonCount:0,preparedSeasonCount:1});
+      assert.match(safe.message,/complete the remaining 2028 offseason stages and advance to the 2029 preseason/);
+      assert.match(safe.message,/Import Season Schedule in Step 2/);
+      assert.match(safe.message,/Do not archive again or disconnect EA/);
+      return true;
+    });
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM madden_discovery_sessions').get().n,sessionsBefore);
+    assert.equal(f.objects.size,objectsBefore);
+    assert.equal(f.sqlite.prepare('SELECT snapshot_id FROM league_active_snapshots').get().snapshot_id,'archived-2028');
+    assert.equal(f.sqlite.prepare("SELECT status FROM franchise_seasons WHERE id='ea-season'").get().status,'closed');
+    Object.assign(hub.careerHubInfo.seasonInfo,{calendarYear:2029,seasonWeekType:0,seasonWeek:0,displayWeek:1});
+    hub.availableWeekInfoList=[{stageIndex:0,weekIndex:0}];
+    const ready=await beginEaCapture({...options,collectionId:'ready-2029',hub});
+    assert.equal(ready.franchiseSeasonId,'season-2029');
+    assert.equal(ready.seasonYear,2029);assert.equal(ready.sourceSeasonId,'4');
+    assert.equal(ready.currentPeriod.key,'preseason:1');
+    assert.equal(eaCapturePlan(hub,{mode:'yearly'}).filter(request=>request.kind==='schedule').length,18);
+    assert.equal(f.sqlite.prepare('SELECT snapshot_id FROM league_active_snapshots').get().snapshot_id,'archived-2028');
+  }finally{f.sqlite.close();}
+});
+
 
 test('preseason captures only league information and rosters and is import-ready without games or stats',async()=>{
   for(const week of [1,2,3,4]){

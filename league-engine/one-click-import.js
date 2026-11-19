@@ -56,6 +56,10 @@
     if(status===403)return{...shared,title:'Commissioner access required',
       summary:'This account is not allowed to perform this action.',
       action:'Check the selected league. Ask a league owner to verify your role in People & Teams.',button:null};
+    if(code==='EA_SEASON_MISMATCH'||/prepared season.*(?:still reporting|does not match)|season.*(?:mismatch|do not match)/i.test(message))return{...shared,
+      title:'Confirm the new season before importing',summary:message,
+      action:'Check the year and phase in Madden. If Madden has advanced but FHQ has not, verify the completed FHQ season and use Archive Season once. If FHQ already prepared the new year, do not archive again. When the seasons match, use Import Season Schedule in Step 2, then Collect League Update in Step 3, Refresh in Step 4, and Import Latest Export in Step 5. Reconnecting EA will not fix a season mismatch. If it returns, copy the support details.',
+      button:'refresh',label:'Refresh Export Readiness'};
     if(phase==='readiness')return{...shared,title:'Import readiness could not be checked',
       summary:'FHQ could not refresh the import controls. Saved exports and live league data are unchanged.',
       action:'Select Refresh Export Readiness to check again. You do not need to collect another export.',button:'refresh',label:'Refresh Export Readiness'};

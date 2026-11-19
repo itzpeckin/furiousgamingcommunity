@@ -1,6 +1,6 @@
 /* FHQ_BUILD: 8.0.10 */
 import { json } from '../../../../_lib/cloud-platform.js';
-import { eaWeeklyReady } from '../../../../_lib/ea-direct.js';
+import { eaWeeklyReady, publicEaSeasonDiagnostic } from '../../../../_lib/ea-direct.js';
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
 import { authorizedEaState, configured, readEaBody, fail, eaErrorResponse, activeEaConnection, sealEa, jobScope } from '../../../../_lib/ea-direct.js';
 
@@ -10,6 +10,7 @@ export function publicEaJob(row){
   const publishing=row.status==='completed'&&row.mode==='yearly'&&result.readyToImport&&result.yearlyScheduleImportId&&!result.importWorkflowId&&!row.error_code;
   return{id:row.id,mode:row.mode,status:publishing?'running':row.status,step:publishing?'Starting season schedule import':row.step,progress:Number(row.progress||0),message:row.message,
     code:row.error_code,coverage:result.coverage||null,readyToImport:Boolean(result.readyToImport),
+    ...(row.error_code==='EA_SEASON_MISMATCH'?{seasonDiagnostic:publicEaSeasonDiagnostic(result.seasonDiagnostic)}:{}),
     previewVerified:Boolean(result.previewVerified),importWorkflowId:result.importWorkflowId||null,private:row.mode==='preview',activationPerformed:false,
     createdAt:row.created_at,completedAt:row.completed_at};
 }

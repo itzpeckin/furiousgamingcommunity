@@ -124,8 +124,30 @@
       title: code === 'EA_LEAGUE_ADVANCING' ? 'Madden is advancing the league' : 'EA has not confirmed the current season and week',
       message: 'Check the season and phase in Madden. If an advance is in progress, wait for it to finish. Do not archive another season or change the week to bypass this check. If it persists, copy the support details for FHQ support.',
       action: active ? 'check-collection' : 'retry-collection', label: active ? 'Check Collection' : 'Try Collection Again'};
-    if (code === 'EA_SEASON_MISMATCH') return {...result, title: 'The season needs checking',
-      message: safeMessage(error.message || 'EA and the prepared FHQ season do not match. Verify the season in Madden and FHQ before collecting again.'), action: null};
+    if (code === 'EA_SEASON_MISMATCH') {
+      const diagnostic=error.seasonDiagnostic||error.payload?.seasonDiagnostic||{};
+      const year=value=>Number.isInteger(Number(value))&&Number(value)>=1900&&Number(value)<=2200?Number(value):null;
+      const preparedYear=year(diagnostic.preparedYear),reportedYear=year(diagnostic.reportedYear);
+      const preparedAhead=preparedYear&&reportedYear&&preparedYear>reportedYear;
+      const preparedBehind=diagnostic.reason==='archive-required'||preparedYear&&reportedYear&&preparedYear<reportedYear;
+      const firstStep=preparedBehind
+        ? `In Command Center, verify that ${preparedYear||'the current FHQ season'} is complete, then use Archive Season once to prepare the next season. If the new season is already prepared, refresh the controls instead.`
+        : preparedAhead
+          ? diagnostic.stage==='offseason'
+            ? `Open the connected franchise in Madden. Finish the remaining ${reportedYear} offseason steps and advance to ${preparedYear} preseason. If Madden already shows ${preparedYear}, try the schedule import once to check EA's latest response.`
+            : `Open the connected franchise in Madden and check its year and phase. Let any season advance finish. When Madden shows ${preparedYear}, try the schedule import once to check EA's latest response.`
+          : 'Check the connected franchise, year and phase in Madden against the prepared season in Command Center. Use Archive Season only if Madden has advanced to the next year and the completed FHQ season has not been archived.';
+      return {...result, seasonDiagnostic:diagnostic,
+        title:preparedAhead?`${preparedYear} is prepared; EA reports ${reportedYear}`:preparedBehind?'Archive the completed FHQ season':'EA and FHQ seasons do not match',
+        message:preparedAhead
+          ? `FHQ is ready for ${preparedYear}, but EA's latest response still identifies ${reportedYear}${diagnostic.stage==='offseason'?' offseason':''}. Your archive is preserved. Archiving in FHQ does not advance the season in Madden.`
+          : safeMessage(error.message||'EA did not identify the franchise season prepared in FHQ. Collection stopped before changing live league data.'),
+        steps:[
+          firstStep,
+          'When Madden shows the prepared season, select Import Season Schedule in Step 2. After it completes, select Collect League Update in Step 3, Refresh in Step 4, and Import Latest Export in Step 5.',
+          `If the season message returns after one attempt, copy the support details below for FHQ support. ${preparedAhead?'Do not archive again, change the season number, or reconnect EA to bypass this check.':'Once the new season is prepared, do not archive it again. Do not change the season number or reconnect EA to bypass this check.'}`
+        ],action:preparedBehind?'archive':'schedule',label:preparedBehind?'Review Archive Season':'Go to Season Schedule'};
+    }
     if (code === 'PREVIEW_REQUIRED') return {...result, title: 'Prepare the season schedule',
       message: 'Use Import Season Schedule in Step 2. Once the schedule is ready, collect the league update in Step 3.', action: 'schedule', label: 'Go to Season Schedule'};
     if (['COLLECTION_BUSY', 'SETUP_BUSY'].includes(code)) return {...result,
@@ -162,13 +184,15 @@
   function supportDetails(issue = currentProblem()) {
     // Only identifiers and known states, never the API payload or EA return address.
     const safeId = value => /^[a-zA-Z0-9_.:-]{1,150}$/.test(String(value || '')) ? value : 'Unavailable';
-    return `League: ${safeId(context)}\nIssue: ${safeId(issue?.code)}\nStep: ${safeId(issue?.operation)}\nCollection: ${safeId(collection?.id)}\nStatus: ${safeId(collection?.status)}\nReference: ${safeId(issue?.referenceId)}\nChecked: ${new Date().toISOString()}`;
+    const diagnostic=issue?.seasonDiagnostic;
+    const seasonDetails=diagnostic?`\nPrepared season: ${safeId(diagnostic.preparedYear)}\nEA reported season: ${safeId(diagnostic.reportedYear)}\nEA phase: ${safeId(diagnostic.stage)}\nEA week: ${safeId(diagnostic.week)}\nSeason check: ${safeId(diagnostic.reason)}`:'';
+    return `League: ${safeId(context)}\nIssue: ${safeId(issue?.code)}\nStep: ${safeId(issue?.operation)}\nCollection: ${safeId(collection?.id)}\nStatus: ${safeId(collection?.status)}\nReference: ${safeId(issue?.referenceId)}${seasonDetails}\nChecked: ${new Date().toISOString()}`;
   }
 
   function recoveryMarkup() {
     const issue = currentProblem();
     if (!issue) return '';
-    return `<section class="ea-direct-recovery" role="${issue.severity === 'status' ? 'status' : 'alert'}"><h4>${esc(issue.title)}</h4><p>${esc(issue.message)}</p><div class="ea-direct-actions">${issue.action ? `<button type="button" class="button button--primary" data-ea-action="${issue.action}" ${busy||loading||polling?'disabled':''}>${esc(issue.label)}</button>` : ''}<button type="button" class="button button--ghost" data-ea-action="copy-support">Copy Support Details</button></div><details><summary>Support details</summary><pre>${esc(supportDetails(issue))}</pre></details></section>`;
+    return `<section class="ea-direct-recovery" role="${issue.severity === 'status' ? 'status' : 'alert'}"><h4>${esc(issue.title)}</h4><p>${esc(issue.message)}</p>${issue.steps?`<p><strong>What the commissioner should do:</strong></p><ol>${issue.steps.map(step=>`<li>${esc(step)}</li>`).join('')}</ol>`:''}<div class="ea-direct-actions">${issue.action ? `<button type="button" class="button button--primary" data-ea-action="${issue.action}" ${busy||loading||polling?'disabled':''}>${esc(issue.label)}</button>` : ''}<button type="button" class="button button--ghost" data-ea-action="copy-support">Copy Support Details</button></div><details><summary>Support details</summary><pre>${esc(supportDetails(issue))}</pre></details></section>`;
   }
 
   async function api(resource, method = 'GET', body, token = ensureContext()) {
@@ -545,6 +569,7 @@
     if (action === 'sign-in') HQ.auth?.login?.();
     if (action === 'retry-collection') collect(collection?.mode || 'weekly');
     if (action === 'schedule') panel.querySelector?.('[data-ea-collect="yearly"], [name="sourceSeasonId"]')?.focus?.();
+    if (action === 'archive') document.querySelector?.('[data-game-year-archive-panel]')?.scrollIntoView?.({block:'center'});
     if (action === 'import-status') {
       HQ.oneClickImport?.refreshWorkspace?.().catch(()=>{});
       document.querySelector?.('[data-compact-import-panel]')?.scrollIntoView?.({block:'start'});

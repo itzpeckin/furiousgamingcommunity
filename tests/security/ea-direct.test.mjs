@@ -7,10 +7,10 @@ import path from 'node:path';
 import { ROOT, walkFiles } from '../../tools/lib/project.mjs';
 import { hashToken } from '../../functions/_lib/auth.js';
 import { sealEa, openEa, parseEaRedirect, safeEaError, eaErrorResponse, readEaBody, createEaSetup, loadEaSetup, lockEaSetup, setupScope } from '../../functions/_lib/ea-direct.js';
-import { createEaClient } from '../../functions/_lib/ea-client.js';
+import { createEaClient, EaClientError } from '../../functions/_lib/ea-client.js';
 import { onRequest as middleware } from '../../functions/api/leagues/[leagueSlug]/ea-direct/_middleware.js';
 import { onRequestGet as connectionGet, onRequestPost as connectionPost } from '../../functions/api/leagues/[leagueSlug]/ea-direct/connection.js';
-import { onRequestPost as syncPost } from '../../functions/api/leagues/[leagueSlug]/ea-direct/sync.js';
+import { onRequestPost as syncPost, publicEaJob } from '../../functions/api/leagues/[leagueSlug]/ea-direct/sync.js';
 import { onRequestPost as stepPost } from '../../functions/api/leagues/[leagueSlug]/ea-direct/collect-step.js';
 
 const envKey={EA_CREDENTIAL_KEY:'ab'.repeat(32),EA_CLIENT_SECRET:'test-only-ea-client-secret'};
@@ -46,6 +46,24 @@ test('EA errors and oversized requests cannot leak upstream secrets',async()=>{
   const safe=safeEaError(new Error('upstream https://example.test/secret-token'));
   assert.equal(JSON.stringify(safe).includes('secret-token'),false);
   await assert.rejects(readEaBody(new Request('https://test.invalid',{method:'POST',body:'x'.repeat(17000)})),/large/);
+});
+
+test('season recovery diagnostics reach the commissioner without exposing provider or credential fields',async()=>{
+  const diagnostic={reportedYear:2028,preparedYear:2029,stage:'offseason',week:16,reason:'prepared-season-ahead',
+    matchingSeasonCount:0,preparedSeasonCount:1,sourceSeasonIdPresent:false,
+    rawBody:'private-provider-response',credential:'private-token',sourceSeasonId:'private-source'};
+  const error=new EaClientError('EA_SEASON_MISMATCH','The next season is prepared.',{status:409});
+  error.seasonDiagnostic=diagnostic;
+  const body=await eaErrorResponse(error).json();
+  const job=publicEaJob({error_code:'EA_SEASON_MISMATCH',status:'failed',result_json:JSON.stringify({seasonDiagnostic:diagnostic})});
+  assert.deepEqual(job.seasonDiagnostic,body.seasonDiagnostic);
+  assert.equal(job.seasonDiagnostic.reportedYear,2028);assert.equal(job.seasonDiagnostic.preparedYear,2029);
+  assert.equal(job.seasonDiagnostic.week,16);assert.equal(job.seasonDiagnostic.reason,'prepared-season-ahead');
+  assert.doesNotMatch(JSON.stringify(body)+JSON.stringify(job),/private-|rawBody|credential/);
+  const malformed=publicEaJob({error_code:'EA_SEASON_MISMATCH',result_json:JSON.stringify({seasonDiagnostic:{
+    reportedYear:'private-year',preparedYear:-1,stage:'private-stage',week:99,reason:'private-reason',matchingSeasonCount:999}})});
+  for(const key of ['reportedYear','preparedYear','stage','week','reason','matchingSeasonCount'])assert.equal(malformed.seasonDiagnostic[key],null);
+  assert.equal(publicEaJob({error_code:null,result_json:JSON.stringify({seasonDiagnostic:diagnostic})}).seasonDiagnostic,undefined);
 });
 
 test('EA failure responses and support logs expose only reconstructed diagnostics',async()=>{
