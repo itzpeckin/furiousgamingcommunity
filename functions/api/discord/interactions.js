@@ -8,6 +8,7 @@ import {
   discordInteractionResponse,
   discordMessageData,
   editDiscordOriginalResponse,
+  sendDiscordPrivateFollowup,
   resolveDiscordContext,
   resolveDiscordTradeComponentContext,
   verifyDiscordInteractionRequest
@@ -34,24 +35,29 @@ function safeCommandError(error){
   const status=Number(error?.status)||500;
   if(status>=400&&status<500)return String(error?.message||'This command could not be completed.').slice(0,1800);
   console.error('Discord command failed:',String(error?.message||error).slice(0,500));
-  return 'FranchiseHQ could not complete that command. No league data was changed. Try again or contact a commissioner.';
+  return 'FranchiseHQ could not complete that command. Check its status before retrying or contact a commissioner.';
 }
 
-async function runCommand(context,c,interaction){
+async function runCommand(context,c,interaction,{deferred=false}={}){
+  let content,status='completed',errorCode=null;
   try{
-    const content=await executeDiscordCommand(c);
-    await completeInteractionReceipt(c.db,interaction.id,{status:'completed',response:content});
-    await flushAfterCommand(context,c);
-    return content;
+    content=await executeDiscordCommand(c);
   }catch(error){
-    const message=safeCommandError(error);
-    await completeInteractionReceipt(c.db,interaction.id,{
-      status:Number(error?.status)>=400&&Number(error?.status)<500?'rejected':'failed',
-      response:message,errorCode:error?.code||`http-${Number(error?.status)||500}`
-    }).catch(()=>{});
-    await flushAfterCommand(context,c);
-    return message;
+    content=safeCommandError(error);
+    status=Number(error?.status)>=400&&Number(error?.status)<500?'rejected':'failed';
+    errorCode=error?.code||`http-${Number(error?.status)||500}`;
   }
+  if(deferred){
+    try{await editDiscordOriginalResponse(interaction,content);}
+    catch(error){
+      errorCode=`delivery-${error.status||'network'}-after-${status}`;
+      status='failed';
+      console.error('Discord response delivery failed:',discordCommandName(interaction),errorCode);
+    }
+  }
+  await completeInteractionReceipt(c.db,interaction.id,{status,response:content,errorCode});
+  await flushAfterCommand(context,c);
+  return content;
 }
 
 async function flushAfterCommand(context,c){
@@ -143,19 +149,10 @@ export async function onRequestPost(context){
     return discordErrorResponse('That Discord interaction is not supported.');
   }
   const command=discordCommandName(interaction);
-  let c;
-  try{
-    c=await resolveDiscordContext(context.env,interaction,{
-      membershipRequired:command!=='join',
-      allowCommissionerBootstrap:Boolean(discordScheduleThreadWeek(command))
-    });
-  }catch(error){
-    return autocomplete
-      ?discordInteractionResponse(DISCORD_RESPONSE_TYPES.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,{choices:[]})
-      :discordErrorResponse(safeCommandError(error));
-  }
+  const options={membershipRequired:command!=='join',allowCommissionerBootstrap:Boolean(discordScheduleThreadWeek(command))};
   if(autocomplete){
     try{
+      const c=await resolveDiscordContext(context.env,interaction,options);
       const choices=await discordAutocompleteChoices(c);
       return discordInteractionResponse(DISCORD_RESPONSE_TYPES.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,{choices});
     }catch(error){
@@ -164,23 +161,34 @@ export async function onRequestPost(context){
     }
   }
   const visibility=discordInteractionIsPrivate(interaction)?'private':'public';
-  let accepted;
-  try{accepted=await createInteractionReceipt(c.db,interaction,{leagueId:c.league.id,visibility});}
-  catch{return discordErrorResponse('FranchiseHQ Discord commands require database migration 34 before they can be enabled.');}
-  if(!accepted)return discordErrorResponse('This Discord interaction was already received. Its first result remains authoritative.');
-
   const owner=typeof context.waitUntil==='function'?context:context.executionContext;
-  if(typeof owner?.waitUntil==='function'){
-    const work=runCommand(context,c,interaction).then(content=>editDiscordOriginalResponse(interaction,content));
-    owner.waitUntil(work.catch(error=>console.error('Discord response delivery failed:',safeCommandError(error))));
-    return discordInteractionResponse(DISCORD_RESPONSE_TYPES.DEFERRED_CHANNEL_MESSAGE,{
-      ...(visibility==='private'?{flags:DISCORD_EPHEMERAL_FLAG}:{}),
-      allowed_mentions:{parse:[]}
+  const deferred=typeof owner?.waitUntil==='function';
+  const dispatch=async()=>{
+    let c,accepted;
+    try{
+      c=await resolveDiscordContext(context.env,interaction,options);
+      accepted=await createInteractionReceipt(c.db,interaction,{leagueId:c.league.id,visibility});
+    }catch(error){
+      const reason=safeCommandError(error);
+      if(!deferred)return discordErrorResponse(reason);
+      if(visibility==='private')return editDiscordOriginalResponse(interaction,reason);
+      // A public deferral cannot become private. Resolve its placeholder before
+      // sending the membership or installation detail only to the caller.
+      await editDiscordOriginalResponse(interaction,'FranchiseHQ could not open this command here.');
+      return sendDiscordPrivateFollowup(interaction,reason);
+    }
+    // Discord can redeliver an interaction. Its first worker owns the reply.
+    if(!accepted)return deferred?null:discordErrorResponse('This Discord interaction was already received. Its first result remains authoritative.');
+    const content=await runCommand(context,c,interaction,{deferred});
+    if(!deferred)return discordInteractionResponse(DISCORD_RESPONSE_TYPES.CHANNEL_MESSAGE,{
+      ...discordMessageData(content),flags:visibility==='private'?DISCORD_EPHEMERAL_FLAG:0
     });
-  }
-  const content=await runCommand(context,c,interaction);
-  return discordInteractionResponse(DISCORD_RESPONSE_TYPES.CHANNEL_MESSAGE,{
-    ...discordMessageData(content),flags:visibility==='private'?DISCORD_EPHEMERAL_FLAG:0
+  };
+  if(!deferred)return dispatch();
+  owner.waitUntil(dispatch().catch(error=>console.error('Discord command finalization failed:',safeCommandError(error))));
+  return discordInteractionResponse(DISCORD_RESPONSE_TYPES.DEFERRED_CHANNEL_MESSAGE,{
+    ...(visibility==='private'?{flags:DISCORD_EPHEMERAL_FLAG}:{}),
+    allowed_mentions:{parse:[]}
   });
 }
 

@@ -43,6 +43,7 @@ export function playerCardImageUrl(value) {
   } catch { return null; }
 }
 export function discordPlayerCardData(player, team = {}, {leagueName = '', lookingFor = null, portraitUrl = null} = {}) {
+  team=team||{};
   const inches = Number(player.heightInches), weight = Number(player.weightLbs);
   return {
     v:DISCORD_PLAYER_CARD_VERSION,n:clean(player.displayName),p:clean(player.position,10),t:clean(team.displayName),a:clean(team.abbreviation,5),

@@ -1,6 +1,12 @@
 import { activeLeagueTeams, resolveTeam, canonicalTeamKey } from './league-teams.js';
 import { currentTradeSeason } from './trade-season.js';
 
+export function listingOwnerChanged(teams,teamKey,player,override){
+  if(override==null&&!['team_external_id','teamId','team_id'].some(key=>Object.hasOwn(player,key)))return false;
+  const owner=override!=null?canonicalTeamKey(override):resolveTeam(teams,player.team_external_id??player.teamId??player.team_id)?.teamKey;
+  return canonicalTeamKey(teamKey)!==owner;
+}
+
 // Retire the old team's listing, never transfer it to the new owner. The active
 // pointer guard prevents a concurrent import from applying stale ownership evidence.
 export async function reconcileTradeBlockListings(db,leagueId,expectedSnapshotId=null){
@@ -25,12 +31,9 @@ export async function reconcileTradeBlockListings(db,leagueId,expectedSnapshotId
   const retired=new Set();
   for(const row of listings){
     const player=JSON.parse(row.data_json||'{}');
-    const sourceTeam=player.team_external_id??player.teamId??player.team_id;
     const override=row.current_team_key??row.to_team_key;
     // Do not infer a move from incomplete source evidence. Explicit unassigned/FA is evidence.
-    if(override==null&&!['team_external_id','teamId','team_id'].some(key=>Object.hasOwn(player,key)))continue;
-    const owner=override!=null?canonicalTeamKey(override):resolveTeam(teams,sourceTeam)?.teamKey;
-    if(canonicalTeamKey(row.team_key)!==owner)retired.add(row.id);
+    if(listingOwnerChanged(teams,row.team_key,player,override))retired.add(row.id);
   }
   let count=0;
   for(const id of retired){

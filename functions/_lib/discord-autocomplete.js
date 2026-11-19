@@ -67,6 +67,10 @@ async function playerChoices(c,query,{teamKey=null,allowedPublicIds=null,showOve
   const allowed=[...new Set((allowedPublicIds||[]).map(clean).filter(Boolean))].slice(0,100);
   if(allowedPublicIds&&!allowed.length)return[];
   const allowedSql=allowed.length?`AND COALESCE(mapping.publicId,candidate.externalId) IN (${allowed.map(()=>'?').join(',')})`:'';
+  // Trade mutations resolve player IDs inside the current Madden franchise.
+  const season=teamKey?await currentTradeSeason(c.db,c.league.id):null;
+  const tradeScope=teamKey?`JOIN franchise_seasons s ON s.id=? AND s.league_id=alias.league_id
+        AND s.source_system=alias.source_system AND s.source_franchise_id=alias.source_franchise_id`:'';
   // Build the small league identity/ownership map once. Joining the alias table
   // directly to every roster row otherwise rescans its franchise-scoped index
   // for each player (millions of reads per keystroke on Production).
@@ -74,6 +78,7 @@ async function playerChoices(c,query,{teamKey=null,allowedPublicIds=null,showOve
       SELECT alias.source_player_id AS externalId,MAX(identity.public_id) AS publicId,
         COALESCE(MAX(ownership.current_team_key),MAX(overlay.to_team_key)) AS overlayTeamKey
       FROM player_source_aliases alias
+      ${tradeScope}
       JOIN player_identities identity ON identity.league_id=alias.league_id AND identity.id=alias.player_identity_id
       LEFT JOIN trade_roster_overlays overlay ON overlay.league_id=alias.league_id
         AND overlay.player_identity_id=identity.id AND overlay.internal_status='active'
@@ -107,7 +112,7 @@ async function playerChoices(c,query,{teamKey=null,allowedPublicIds=null,showOve
       WHEN substr(lower(candidate.displayName),1,length(?))=? THEN 1 ELSE 2 END,
       lower(candidate.displayName),candidate.externalId
     LIMIT 25`;
-  const args=[c.league.id,c.league.id,query,query,query,query,team?.teamKey||null,team?.teamKey||null,team?.externalId||null,
+  const args=[...(teamKey?[season?.id??null]:[]),c.league.id,c.league.id,query,query,query,query,team?.teamKey||null,team?.teamKey||null,team?.externalId||null,
     ...allowed,query,query,query,query,query];
   const rows=(await c.db.prepare(sql).bind(...args).all()).results||[];
   return uniqueChoices(rows.map(row=>{
