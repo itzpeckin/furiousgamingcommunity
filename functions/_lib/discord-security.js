@@ -329,13 +329,42 @@ export async function completeInteractionReceipt(db,interactionId,{status='compl
     completed_at=CURRENT_TIMESTAMP WHERE interaction_id=?`).bind(status,digest,errorCode,String(interactionId)).run();
 }
 
-export async function editDiscordOriginalResponse(interaction,message,{fetchImpl=fetch}={}){
+function interactionWebhookUrl(interaction){
   const applicationId=String(interaction.application_id||'');
   const token=String(interaction.token||'');
   if(!SNOWFLAKE.test(applicationId)||!token)throw new Error('Discord response token is unavailable.');
-  const response=await fetchImpl(`https://discord.com/api/v10/webhooks/${encodeURIComponent(applicationId)}/${encodeURIComponent(token)}/messages/@original`,{
-    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(discordMessageData(message||'Done.'))
-  });
-  if(!response.ok)throw new Error(`Discord response update failed with ${response.status}.`);
-  return true;
+  return `https://discord.com/api/v10/webhooks/${encodeURIComponent(applicationId)}/${encodeURIComponent(token)}`;
+}
+
+export async function sendDiscordPrivateFollowup(interaction,message){
+  const response=await fetch(interactionWebhookUrl(interaction),{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({...discordMessageData(message),flags:DISCORD_EPHEMERAL_FLAG})});
+  if(!response.ok)throw new Error(`Discord private follow-up failed with ${response.status}.`);
+}
+
+export async function editDiscordOriginalResponse(interaction,message,{fetchImpl=fetch,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
+  const url=`${interactionWebhookUrl(interaction)}/messages/@original`;
+  let data=discordMessageData(message||'Done.');
+  for(let attempt=0;;attempt++){
+    let response;
+    try{response=await fetchImpl(url,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(data)});}
+    catch{
+      if(attempt>=2)throw new Error('Discord response update could not reach Discord.');
+      await sleep(250*(attempt+1));
+      continue;
+    }
+    if(response.ok)return true;
+    const detail=await response.json().catch(()=>({}));
+    if(attempt<2){
+      if(data.embeds?.length&&(detail.code===50035||detail.code===50013)){
+        const rows=data.embeds.flatMap(embed=>[embed.title,embed.description,...(embed.fields||[]).map(field=>`${field.name}: ${field.value}`)]).filter(Boolean);
+        data={...data,content:[data.content,...rows].filter(Boolean).join('\n').slice(0,2000),embeds:[],allowed_mentions:{parse:[]}};
+        continue;
+      }
+      const retryMs=response.status===429?Number(detail.retry_after??response.headers.get('retry-after')??1)*1000
+        :response.status>=500?250*(attempt+1):null;
+      if(retryMs!==null&&Number.isFinite(retryMs)&&retryMs>=0&&retryMs<=5000){await sleep(retryMs);continue;}
+    }
+    throw Object.assign(new Error(`Discord response update failed with ${response.status}.`),{status:response.status});
+  }
 }

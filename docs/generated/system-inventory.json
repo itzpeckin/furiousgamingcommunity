@@ -296,7 +296,7 @@
         "file": "functions/_lib/loadout-glyph-templates.js"
       },
       {
-        "bytes": 240737,
+        "bytes": 249430,
         "file": "tests/discord/discord-bot.test.mjs"
       },
       {
@@ -332,7 +332,7 @@
         "file": "FHQ-6126-index.html"
       },
       {
-        "bytes": 71679,
+        "bytes": 74471,
         "file": "functions/_lib/discord-read-model.js"
       },
       {

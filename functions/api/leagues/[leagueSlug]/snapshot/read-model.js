@@ -312,13 +312,25 @@ export async function activeSnapshotDomainPage(db, leagueId, snapshotId, domain,
   let publicPlayerIds = null;
   if (domain === 'players' && result.length) {
     const identityRows = await rows(db, `
+      WITH scope AS (
+        SELECT source_system,source_franchise_id FROM franchise_seasons
+        WHERE league_id=? AND id=COALESCE(
+          (SELECT dest.franchise_season_id FROM companion_candidate_import_runs run
+           JOIN companion_import_destinations dest ON dest.id=run.destination_id AND dest.league_id=run.league_id
+           WHERE run.league_id=? AND run.candidate_snapshot_id=? ORDER BY run.created_at DESC LIMIT 1),
+          (SELECT s.id FROM franchise_seasons s JOIN league_active_snapshots a ON a.league_id=s.league_id
+           WHERE a.snapshot_id=? AND s.league_id=? AND s.status='active' ORDER BY s.season_year DESC,s.created_at DESC LIMIT 1))
+      )
       SELECT aliases.source_player_id, identities.public_id, aliases.updated_at
       FROM player_source_aliases aliases
       JOIN player_identities identities
         ON identities.id=aliases.player_identity_id AND identities.league_id=aliases.league_id
       WHERE aliases.league_id=?
+        AND aliases.source_player_id IN (SELECT value FROM json_each(?))
+        AND (NOT EXISTS (SELECT 1 FROM scope) OR EXISTS (SELECT 1 FROM scope
+          WHERE scope.source_system=aliases.source_system AND scope.source_franchise_id=aliases.source_franchise_id))
       ORDER BY aliases.updated_at DESC
-    `, leagueId);
+    `, leagueId,leagueId,snapshotId,snapshotId,leagueId,leagueId,JSON.stringify(result.map(row=>row.external_id)));
     publicPlayerIds = new Map();
     for (const identity of identityRows) {
       const sourcePlayerId = String(identity.source_player_id || '');

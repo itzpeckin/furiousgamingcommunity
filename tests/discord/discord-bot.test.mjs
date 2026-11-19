@@ -19,6 +19,7 @@ import {
   discordGlobalCommandsNamed
 } from '../../functions/_lib/discord-commands.js';
 import { onRequestPost as discordInteractions } from '../../functions/api/discord/interactions.js';
+import { editDiscordOriginalResponse } from '../../functions/_lib/discord-security.js';
 import { flushDiscordDeliveries, queueCommitteeReviewDelivery, queueTradeRoomUpdate, tradeConversationMessage } from '../../functions/_lib/discord-delivery.js';
 import { queueDiscordTradeSync } from '../../functions/_lib/discord-trade-sync.js';
 import { tradeDecisionCustomId } from '../../functions/_lib/discord-trade-components.js';
@@ -1706,6 +1707,11 @@ test('/trade-block add and remove are private, roster-authorized, and use player
     database.prepare(`INSERT INTO player_source_aliases
       (league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id)
       VALUES ('league-a','madden-companion','franchise-a','chase-rb','identity-chase','season-a','season-a')`).run();
+    database.prepare(`INSERT INTO player_identities (id,league_id,public_id,display_name)
+      VALUES ('old-chase','league-a','plr_ffffffffffffffffffffffffffffffff','Archived Player')`).run();
+    database.prepare(`INSERT INTO player_source_aliases
+      (league_id,source_system,source_franchise_id,source_player_id,player_identity_id,first_seen_season_id,last_seen_season_id,updated_at)
+      VALUES ('league-a','madden-companion','archived-source','chase-rb','old-chase','season-a','season-a','2000-01-01')`).run();
     const db=d1(database),key=await signingKey();
     const autocomplete=await discordInteractions(await signedContext({db,key,interaction:interaction({
       id:'100000000000000076',name:'trade-block',type:4,options:[{type:1,name:'add',options:[
@@ -2341,6 +2347,156 @@ test('slash results do not wait behind a stalled Discord notification request an
     releaseDelivery();await Promise.all(pending);
     assert.equal(database.prepare(`SELECT status FROM discord_delivery_events WHERE idempotency_key='league-notification:slow-notice'`).get().status,'sent');
   }finally{releaseDelivery?.();globalThis.fetch=originalFetch;database.close()}
+});
+
+test('numbered weeks stay regular-season and the current schedule labels opening-week previews',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    const leagueId='league-a',snapshotId=seedActiveWeek(database,{leagueId,week:1});
+    database.prepare('UPDATE league_snapshots SET manifest_json=? WHERE id=?')
+      .run(JSON.stringify({currentPeriod:{stage:'preseason',week:1}}),snapshotId);
+    const db=d1(database),key=await signingKey();
+    let id=100000000000000080n;
+    const run=async(name,options)=>{
+      const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
+        id:String(++id),name:'schedule',options:[{type:1,name,options}]
+      })}));
+      return (await response.json()).data.content;
+    };
+    const numbered=()=>run('week',[{type:4,name:'number',value:1}]);
+    assert.match(await numbered(),/Regular Season Week 1[\s\S]*SF[\s\S]*TB/);
+    assert.match(await run('current'),/Preseason Week 1[\s\S]*Regular Season Week 1 preview[\s\S]*SF/);
+    seedSnapshotRecord(database,{leagueId,snapshotId,domain:'games',externalId:'pre-1',data:{
+      external_id:'pre-1',season_year:2026,stage:'preseason',week_index:1,away_team_external_id:'1001',home_team_external_id:'1002',status:'scheduled'
+    }});
+    const current=await run('current');
+    assert.match(current,/Preseason Week 1[\s\S]*TB[\s\S]*SF/);
+    assert.doesNotMatch(current,/preview/);
+    assert.equal((await numbered()).split('\n').length,2);
+  }finally{database.close()}
+});
+
+test('trade-block view lists players beyond the ten-card limit without initializing draft picks or reading workflows',async()=>{
+  const database=new DatabaseSync(':memory:');
+  try{
+    await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedActiveWeek(database,{leagueId:'league-a'});
+    for(let i=0;i<12;i++){
+      database.prepare('INSERT INTO player_identities (id,league_id,public_id,display_name) VALUES (?,?,?,?)')
+        .run('player-'+i,'league-a','key-'+i,'Player '+i);
+      database.prepare(`INSERT INTO trade_block_listings (id,league_id,team_key,asset_type,player_identity_id,listed_by_user_id)
+        VALUES (?,'league-a',?,'player',?,'user-a')`).run('listing-'+i,i===11?'sf':'tb','player-'+i);
+    }
+    const db=d1(database),key=await signingKey(),sql=[],prepare=db.prepare.bind(db);
+    db.prepare=query=>{sql.push(query);return prepare(query)};
+    const view=async(id,options)=>{
+      const response=await discordInteractions(await signedContext({db,key,interaction:interaction({
+        id,name:'trade-block',options:[{type:1,name:'view',options}]
+      })}));
+      return (await response.json()).data;
+    };
+    const board=await view('100000000000000081',[]);
+    assert.match(board.content,/12 listed/);
+    for(let i=0;i<12;i++)assert.ok(board.content.includes('Player '+i));
+    assert.equal(board.embeds.length,10);
+    const filtered=await view('100000000000000082',[{type:3,name:'team',value:'sf'}]);
+    assert.match(filtered.content,/1 listed/);
+    assert.equal(filtered.embeds[0].title,'Player 11');
+    assert.match(filtered.embeds[0].description,/current imported roster/);
+    assert.ok(!sql.some(query=>/FROM trade_workflows|INSERT INTO league_draft_picks/i.test(query)));
+  }finally{database.close()}
+});
+
+test('trade block acknowledges a signed request before the first database lookup resolves',async()=>{
+  const database=new DatabaseSync(':memory:'),originalFetch=globalThis.fetch,pending=[],requests=[];
+  let release;
+  const gate=new Promise(resolve=>{release=resolve});
+  try{
+    await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    seedActiveWeek(database,{leagueId:'league-a'});
+    const db=d1(database),prepare=db.prepare.bind(db);
+    db.prepare=sql=>{
+      const statement=prepare(sql),first=statement.first.bind(statement);
+      statement.first=async()=>{await gate;return first()};
+      return statement;
+    };
+    globalThis.fetch=async(url,options)=>{requests.push(JSON.parse(options.body));return Response.json({})};
+    const context=await signedContext({db,key:await signingKey(),interaction:interaction({
+      name:'trade-block',options:[{type:1,name:'view'}]
+    })});
+    context.waitUntil=promise=>pending.push(promise);
+    const response=await Promise.race([discordInteractions(context),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Discord waited for the database')),1000).unref())]);
+    assert.equal((await response.json()).type,5);
+    assert.equal(requests.length,0);
+    release();
+    await Promise.all(pending);
+    assert.match(requests[0].content,/Trade Block/);
+  }finally{release();await Promise.allSettled(pending);globalThis.fetch=originalFetch;database.close()}
+});
+
+test('an unauthorized public deferral sends access details privately and does not execute the command',async()=>{
+  const database=new DatabaseSync(':memory:'),originalFetch=globalThis.fetch,pending=[],requests=[];
+  try{
+    await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    globalThis.fetch=async(url,options)=>{requests.push(JSON.parse(options.body));return Response.json({})};
+    const context=await signedContext({db:d1(database),key:await signingKey(),interaction:interaction({
+      name:'trade-block',options:[{type:1,name:'view'}]
+    })});
+    context.waitUntil=promise=>pending.push(promise);
+    assert.equal((await (await discordInteractions(context)).json()).type,5);
+    await Promise.all(pending);
+    assert.equal(requests.length,2);
+    assert.doesNotMatch(requests[0].content,/join|membership|Trade Block/i);
+    assert.equal(requests[1].flags,64);
+    assert.match(requests[1].content,/join/i);
+    assert.equal(database.prepare('SELECT count(*) AS n FROM discord_interaction_receipts').get().n,0);
+  }finally{globalThis.fetch=originalFetch;database.close()}
+});
+
+test('deferred webhook edits retry throttling and downgrade rejected rich messages without replaying a command',async()=>{
+  const attempts=[],waits=[];
+  const responses=[
+    Response.json({retry_after:0.01},{status:429}),
+    Response.json({code:50035},{status:400}),
+    Response.json({})
+  ];
+  await editDiscordOriginalResponse(interaction(),{content:'Trade Block',embeds:[{title:'Player One'}]},{
+    fetchImpl:async(url,options)=>{assert.equal(options.method,'PATCH');attempts.push(JSON.parse(options.body));return responses.shift()},
+    sleep:async ms=>{waits.push(ms)}
+  });
+  assert.deepEqual(waits,[10]);
+  assert.deepEqual(attempts[0],attempts[1]);
+  assert.match(attempts[2].content,/Player One/);
+  assert.deepEqual(attempts[2].embeds,[]);
+});
+
+test('failed Discord delivery is distinguishable from command execution in the receipt',async()=>{
+  const database=new DatabaseSync(':memory:'),originalFetch=globalThis.fetch;
+  try{
+    await applyMigrations(database);
+    seedLeague(database,{id:'league-a',slug:'alpha',guild:'100000000000000001'});
+    seedMember(database,{leagueId:'league-a'});
+    const db=d1(database),key=await signingKey(),pending=[];
+    let edits=0;
+    globalThis.fetch=async()=>{edits++;return Response.json({code:10015},{status:404})};
+    const context=await signedContext({db,key,interaction:interaction({id:'100000000000000090'})});
+    context.waitUntil=promise=>pending.push(promise);
+    assert.equal((await (await discordInteractions(context)).json()).type,5);
+    await Promise.all(pending);
+    const row=database.prepare('SELECT status,error_code FROM discord_interaction_receipts').get();
+    assert.equal(edits,1);
+    assert.equal(row.status,'failed');
+    assert.equal(row.error_code,'delivery-404-after-completed');
+  }finally{globalThis.fetch=originalFetch;database.close()}
 });
 
 test('production-style execution defers inside three seconds and edits the original response',async()=>{

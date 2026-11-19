@@ -3,11 +3,13 @@ import { tradeCenterSettingsFromLeagueDocument } from './trade-center.js';
 import { readGameplayRules, GAMEPLAY_STATS, gameplayRuleSummary, statRuleViolation, abilityPositionWeight, abilityWeightSummary } from './gameplay-rules.js';
 import {
   activeSnapshotDomainPage,
-  activeSnapshotRecord
+  activeSnapshotRecord,
+  normalizePlayer
 } from '../api/leagues/[leagueSlug]/snapshot/read-model.js';
 import { activeLeagueTeams, activeTeamAssignments, resolveTeam } from './league-teams.js';
 import { applyRosterOverlays } from './trade-center.js';
-import { tradeCenterState } from '../api/leagues/[leagueSlug]/trade-center.js';
+import { currentTradeSeason } from './trade-season.js';
+import { listingOwnerChanged } from './trade-block-reconciliation.js';
 import { competitionState } from '../api/leagues/[leagueSlug]/competition.js';
 import { leagueNewsState } from './league-news.js';
 import { buildGmSeasonSummaries } from './gm-career.js';
@@ -225,18 +227,22 @@ function gameLine(teams,game,{includeWeek=false,records=null,statuses=null,plain
 export async function scheduleCommand(c,values){
   const model=await discordLeagueReadModel(c,{domains:['teams','games','standings']});
   const records=standingRecords(model),statuses=playoffStatusByTeam(model);
-  const currentWeek=number(model.snapshot.week_index)??number(c.league.current_week)??1;
+  const clock=snapshotCurrentPeriod(model.snapshot);
+  const currentWeek=clock?.week??number(c.league.current_week)??1;
   let view=clean(values.view);
   if(!view&&values.scope)view=lower(values.scope)==='week'?`week:${number(values.week)??currentWeek}`:'season';
+  const current=!view;
   view=view||`week:${currentWeek}`;
   let week=null,requestedTeam='';
   if(/^week:\d+$/i.test(view))week=number(view.split(':')[1]);
   else if(/^week\s*\d+$/i.test(view))week=number(view.match(/\d+/)?.[0]);
   else if(view.startsWith('team:'))requestedTeam=view.slice('team:'.length);
   else if(view!=='season')requestedTeam=view;
-  const clock=snapshotCurrentPeriod(model.snapshot,false);
-  let games=model.games.filter(game=>(week===null||number(game.week)===week)
-    &&(week===null||!clock||canonicalGameStage(game.stage)===clock.stage));
+  const stage=current?(clock?.stage||'regular-season'):'regular-season';
+  const stageName={preseason:'Preseason','regular-season':'Regular Season',playoffs:'Postseason',offseason:'Offseason'}[stage];
+  const seasonGames=model.games.filter(game=>game.season==null||model.snapshot.season_year==null
+    ||number(game.season)===number(model.snapshot.season_year));
+  let games=seasonGames.filter(game=>week===null||number(game.week)===week&&canonicalGameStage(game.stage)===stage);
   if(requestedTeam){
     const team=resolveTeam(model.teams,requestedTeam);
     if(!team)throw Object.assign(new Error('That team was not found in the active league.'),{status:404});
@@ -255,9 +261,14 @@ export async function scheduleCommand(c,values){
     ]);
   }
   const selectedTeam=requestedTeam?resolveTeam(model.teams,requestedTeam):null;
-  const heading=`${c.league.name} · ${selectedTeam?`${selectedTeam.displayName} Schedule`:week===null?'Season Schedule':`Week ${week}`}`;
+  const heading=`${c.league.name} · ${selectedTeam?`${selectedTeam.displayName} Schedule`:week===null?'Season Schedule':`${stageName} Week ${week}`}`;
+  if(current&&!games.length&&stage==='preseason'){
+    const openingWeek=seasonGames.filter(game=>canonicalGameStage(game.stage)==='regular-season'&&number(game.week)===1);
+    if(openingWeek.length)return truncate([heading,'No preseason matchups have been imported.',
+      'Regular Season Week 1 preview',...openingWeek.map(game=>gameLine(model.teams,game,{records,statuses,plain:true}))].join('\n'));
+  }
   return truncate([heading,...(games.length?games.slice(0,40).map(game=>gameLine(model.teams,game,{includeWeek:true,records,statuses,plain:true})):[
-    'No matching records were found.'
+    week===null?'No matching records were found.':`No matchups have been imported for ${stageName} Week ${week}.`
   ])].join('\n'));
 }
 
@@ -275,7 +286,7 @@ export async function gamesCommand(c,values){
   const games=currentPeriod.filter(game=>canonicalGameStage(game.stage)===activeStage)
     .sort((a,b)=>clean(a.scheduledAt).localeCompare(clean(b.scheduledAt))||clean(a.id).localeCompare(clean(b.id)));
   const played=games.filter(gamePlayed),unplayed=games.filter(game=>!gamePlayed(game));
-  const stage=activeStage==='preseason'?'Preseason':activeStage==='playoffs'?'Postseason':'Regular Season';
+  const stage={preseason:'Preseason',playoffs:'Postseason',offseason:'Offseason'}[activeStage]||'Regular Season';
   const assignments=await activeTeamAssignments(c.db,c.league.id,model.teams),records=standingRecords(model);
   const safe=value=>clean(value).replace(/([\\*_~`|<>])/g,'\\$1').slice(0,90);
   const side=(id,label)=>{
@@ -291,7 +302,9 @@ export async function gamesCommand(c,values){
   return{content:`**${safe(c.league.name)} · ${context.seasonYear} · ${stage} Week ${context.week} Games**`,
     embeds:[{title:`${status==='played'?'Played':status==='unplayed'?'Unplayed':'Weekly matchups'} · ${selected.length}`,
       description:`Played (${played.length}) · Unplayed (${unplayed.length})`,color:0x5b83f5,
-      ...(fields.length?{fields:fields.slice(0,16)}:{description:'No matching games are scheduled for the active week.'})}],
+        ...(fields.length?{fields:fields.slice(0,16)}:{description:games.length
+          ?`No ${status} games in this period. Played (${played.length}) · Unplayed (${unplayed.length}).`
+          :`No matchups have been imported for ${stage} Week ${context.week}.${activeStage==='preseason'?' Use /schedule week to view a regular-season week.':''}`})}],
     allowed_mentions:{parse:[]}};
 }
 
@@ -1001,52 +1014,71 @@ export async function statsCommand(c,values,{leaders=false}={}){
 }
 
 export async function tradeBlockCommand(c,values){
-  c.teams=await activeLeagueTeams(c.db,c.league.id);
-  const state=await tradeCenterState(c);
+  const [teams,season,snapshot]=await Promise.all([
+    activeLeagueTeams(c.db,c.league.id),currentTradeSeason(c.db,c.league.id),activeSnapshotRecord(c.db,c.league.id)
+  ]);
+  if(!snapshot)throw Object.assign(new Error('This league does not have an active Madden snapshot yet.'),{status:409});
   const teamQuery=lower(values.team),position=lower(values.position);
-  let listings=state.listings;
-  if(teamQuery)listings=listings.filter(item=>{
-    const team=resolveTeam(state.teams,item.teamKey);
-    return [item.teamKey,team?.displayName,team?.abbreviation].some(value=>lower(value).includes(teamQuery));
-  });
-  const model=await discordLeagueReadModel(c,{domains:['teams','players']});
-  const playerByKey=new Map();
-  for(const player of model.players){
-    for(const key of [player.publicId,player.id,player.sourcePlayerId]){
-      if(key!==null&&key!==undefined&&String(key))playerByKey.set(String(key),player);
-    }
+  // A slash-command read only needs listed assets. Keep draft initialization,
+  // workflow history and unlisted roster pages out of this request.
+  const active=await rows(c.db,`SELECT b.team_key AS teamKey,b.requested_return AS requestedReturn,
+      b.draft_pick_id AS draftPickId,i.display_name AS playerName,i.public_id AS publicId,
+      p.needs_json AS needsJson,COALESCE(o.current_team_key,v.to_team_key) AS overrideTeam,
+      (SELECT r.data_json FROM player_source_aliases a
+       JOIN franchise_seasons s ON s.id=? AND s.league_id=a.league_id
+         AND s.source_system=a.source_system AND s.source_franchise_id=a.source_franchise_id
+       JOIN league_snapshot_records r ON r.league_id=a.league_id AND r.snapshot_id=?
+         AND r.domain='players' AND r.external_id=a.source_player_id
+       WHERE a.league_id=b.league_id AND a.player_identity_id=b.player_identity_id
+       ORDER BY a.updated_at DESC,a.source_player_id LIMIT 1) AS rosterJson
+    FROM trade_block_listings b
+    LEFT JOIN player_identities i ON i.league_id=b.league_id AND i.id=b.player_identity_id
+    LEFT JOIN trade_block_team_profiles p ON p.league_id=b.league_id AND p.team_key=b.team_key
+    LEFT JOIN league_player_ownership o ON o.league_id=b.league_id AND o.player_identity_id=b.player_identity_id
+    LEFT JOIN trade_roster_overlays v ON v.league_id=b.league_id AND v.player_identity_id=b.player_identity_id AND v.internal_status='active'
+    WHERE b.league_id=? AND b.active=1 ORDER BY b.updated_at DESC,b.id`,season?.id??null,snapshot.id,c.league.id);
+  const listings=[];
+  const selectedTeam=teamQuery?resolveTeam(teams,teamQuery):null;
+  for(const item of active){
+    const team=resolveTeam(teams,item.teamKey);
+    if(selectedTeam&&team?.teamKey!==selectedTeam.teamKey)continue;
+    if(!selectedTeam&&teamQuery&&![item.teamKey,team?.displayName,team?.abbreviation].some(value=>lower(value).includes(teamQuery)))continue;
+    const raw=item.rosterJson?JSON.parse(item.rosterJson):null;
+    if(listingOwnerChanged(teams,item.teamKey,raw||{},item.overrideTeam))continue;
+    const player=raw?normalizePlayer(raw,item.publicId):null;
+    if(position&&!lower(player?.position).includes(position))continue;
+    listings.push({...item,player,team});
   }
-  const aliases=await rows(c.db,`SELECT player_identity_id AS playerIdentityId,source_player_id AS sourcePlayerId
-    FROM player_source_aliases WHERE league_id=? ORDER BY updated_at DESC`,c.league.id);
-  const sourceByIdentity=new Map();
-  for(const alias of aliases){
-    const identityId=String(alias.playerIdentityId||'');
-    if(identityId&&!sourceByIdentity.has(identityId))sourceByIdentity.set(identityId,String(alias.sourcePlayerId||''));
-  }
-  const listedPlayer=item=>playerByKey.get(String(item.playerPublicId||''))
-    ||playerByKey.get(sourceByIdentity.get(String(item.playerIdentityId||'')))
-    ||playerByKey.get(String(item.playerIdentityId||''));
-  if(position)listings=listings.filter(item=>lower(listedPlayer(item)?.position).includes(position));
-  const needs=new Map(state.teamNeeds.map(item=>[item.teamKey,item.needs]));
   if(!listings.length)return lines(`${c.league.name} · Trade Block`,[],'No matching players are currently listed.');
   const shown=listings.slice(0,10);
   const embeds=await Promise.all(shown.map(async item=>{
-    const player=listedPlayer(item);
-    const looking=item.requestedReturn||needs.get(item.teamKey)?.join(', ')||'Open to offers';
+    const {player,team}=item;
+    let needs=[];
+    try{needs=JSON.parse(item.needsJson||'[]')}catch{}
+    const looking=item.requestedReturn||(Array.isArray(needs)&&needs.join(', '))||'Open to offers';
     if(player){
-      return discordPlayerCardEmbed(c,player,resolveTeam(model.teams,player.teamId),{lookingFor:looking,url:playerHref(c,player),portraitUrl:playerPortraitUrl(player)});
+      return discordPlayerCardEmbed(c,player,team,{lookingFor:looking,url:playerHref(c,player),portraitUrl:playerPortraitUrl(player)});
     }
-    const team=resolveTeam(model.teams,item.teamKey)||resolveTeam(state.teams,item.teamKey);
     return {
       title:item.playerName||item.draftPickId||'Trade asset',
       color:embedColor(team?.primaryColor),
-      description:team?.displayName||teamName(state.teams,item.teamKey),
+      description:[team?.displayName||item.teamKey,item.draftPickId?null:'No matching player in the current imported roster.'].filter(Boolean).join(' · '),
       fields:[{name:'Looking For',value:truncate(looking,1000),inline:false}],
       footer:{text:`${c.league.name} · Trade Block`}
     };
   }));
+  const heading=`**${c.league.name} · Trade Block** · ${listings.length} listed · [Open Trade Block](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-block)`;
+  const byTeam=new Map();
+  for(const item of listings){
+    const label=item.team?.abbreviation||item.teamKey;
+    if(!byTeam.has(label))byTeam.set(label,[]);
+    const name=item.player?.displayName||item.playerName||item.draftPickId||'Trade asset';
+    byTeam.get(label).push(!item.player&&!item.draftPickId?`${name} (roster unverified)`:name);
+  }
+  const roster=[...byTeam].map(([label,names])=>`**${label}** · ${names.join(', ')}`).join('\n');
+  const note=listings.length>shown.length?`\nShowing the first ${shown.length} cards. Filter by team or position for more.`:'';
   return {
-    content:`**${c.league.name} · Trade Block** · ${listings.length} listed${listings.length>shown.length?` · first ${shown.length} shown`:''} · [Open Trade Block](https://franchisehq.app/leagues/${encodeURIComponent(c.league.slug)}#trade-block)`,
+    content:`${heading}\n${truncate(roster,1950-heading.length-note.length)}${note}`,
     embeds
   };
 }
