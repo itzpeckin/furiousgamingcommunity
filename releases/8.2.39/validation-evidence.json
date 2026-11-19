@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "version": "8.2.39",
-  "status": "validated-review-candidate",
-  "evidenceScope": "Application release candidate only; the normal authorized live archive/2029 collection/publication operations are recorded separately under incidentDiagnosis and authorizedLiveOperations. Application dataChanged=false does not assert that no live operation wrote data.",
-  "productionChanged": false,
+  "status": "production-deployed-pending-owner-acceptance",
+  "evidenceScope": "Application release and deployment; the separately authorized live archive/2029 collection/publication operations are recorded under incidentDiagnosis and authorizedLiveOperations. Application dataChanged=false does not assert that no live operation wrote data.",
+  "productionChanged": true,
   "dataChanged": false,
   "credentialsChanged": false,
   "baselineGate": {
@@ -111,10 +111,25 @@
   },
   "external": {
     "hostedChecks": {
-      "status": "not-run"
+      "status": "passed",
+      "qualityRunId": 44458026256,
+      "qualityRunUrl": "https://github.com/itzpeckin/furiousgamingcommunity/actions/runs/44458026256",
+      "qualityDurationSeconds": 72,
+      "cloudflarePages": "passed",
+      "importWorker": "passed",
+      "mainQualityRunId": 44458291953,
+      "mainQualityRunUrl": "https://github.com/itzpeckin/furiousgamingcommunity/actions/runs/44458291953",
+      "mainQualityDurationSeconds": 76,
+      "mainQualityStatus": "passed"
     },
     "productionDeployment": {
-      "status": "not-run"
+      "authorized": true,
+      "authorization": "Owner explicitly instructed: publish it.",
+      "status": "success",
+      "deploymentId": "3af24ab9-9072-4ea6-b683-e5cb64aad60e",
+      "url": "https://3af24ab9.franchise-hq.pages.dev",
+      "sourceCommit": "935e833915fcb137143414f92adf2f4e5b63c411",
+      "completedAt": "2026-11-19T04:26:23.91033Z"
     },
     "live2029Acceptance": {
       "status": "passed",
@@ -126,13 +141,67 @@
       "archive2028Preserved": true
     },
     "deploymentConfiguration": {
-      "status": "prepared",
+      "status": "deployed",
       "APP_VERSION": "8.2.39",
       "environments": [
         "preview",
         "production"
       ],
-      "applicationDeploymentCompleted": false
+      "applicationDeploymentCompleted": true
+    },
+    "githubPullRequest": {
+      "status": "merged",
+      "number": 224,
+      "url": "https://github.com/itzpeckin/furiousgamingcommunity/pull/224",
+      "candidateCommit": "237c2ec22ba7cfd44f1a352611ebfe4c4e341914",
+      "mainCommit": "935e833915fcb137143414f92adf2f4e5b63c411",
+      "mergedAt": "2026-11-19T04:26:01Z"
+    },
+    "previewDeployment": {
+      "status": "passed",
+      "deploymentId": "23891ab7-65e6-4dd1-b7ac-f9c1556f038d",
+      "release": "8.2.39",
+      "health": "passed",
+      "d1IsolationVerified": true,
+      "r2IsolationVerified": true
+    },
+    "productionHealth": {
+      "status": "passed",
+      "url": "https://franchisehq.app/api/health",
+      "httpStatus": 200,
+      "release": "8.2.39",
+      "accountEmail": "ready",
+      "discordScheduling": "ready",
+      "discordLoadoutReader": "ready",
+      "recoveryJavaScriptPresent": true,
+      "preparedSeasonJavaScriptPresent": true,
+      "browserShellRelease": "8.2.39"
+    },
+    "postDeploymentDataPreservation": {
+      "status": "passed",
+      "activeSeasonYear": 2029,
+      "activeSnapshotId": "2eaed956-20be-45cb-90ae-4c20e54a304b",
+      "games": 272,
+      "players": 2941,
+      "archive2028Digest": "8ba04c2e499db1cd0f7256a4a54bf910d237c12deb5559e79488b5a95b6bbb8a",
+      "archive2028DigestUnchanged": true,
+      "archive2028PlayerSummaries": 2579
+    },
+    "browserAcceptance": {
+      "status": "passed",
+      "surface": "Fresh separate commissioner tab",
+      "release": "8.2.39",
+      "activeLeagueSeason": 2029,
+      "activeWeek": 1,
+      "snapshotLive": true,
+      "completedScheduleWeeks": 18,
+      "games": 272,
+      "scheduleStatus": "Complete",
+      "latestExportStatus": "Live",
+      "capturedPhase": "Preseason Week 1",
+      "activationAuditAtUtc": "2026-11-19 04:15:53",
+      "seasonMismatchWarningPresent": false,
+      "ownerAcceptance": "pending"
     }
   },
   "authorizedLiveOperations": {

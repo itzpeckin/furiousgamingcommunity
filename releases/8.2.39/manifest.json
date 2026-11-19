@@ -3,7 +3,7 @@
   "product": "FranchiseHQ",
   "version": "8.2.39",
   "releaseType": "season-rollover-guidance-fix",
-  "status": "validated-review-candidate",
+  "status": "production-deployed-pending-owner-acceptance",
   "sourceBaseline": {
     "tag": "v8.2.38",
     "commit": "8f9bff5b71a342ae3d628e3eb68640f48d6ee3ce"
@@ -12,16 +12,29 @@
   "knownInheritedIssues": [],
   "production": {
     "authorized": true,
-    "deployed": false,
-    "authorization": "Owner requested the live 2028 archive/2029 season update repair and clearer commissioner recovery instructions.",
-    "currentRelease": "8.2.38",
+    "deployed": true,
+    "authorization": "Owner explicitly instructed: publish it.",
+    "currentRelease": "8.2.39",
     "candidateRelease": "8.2.39",
     "currentMigration": 56,
-    "candidateMigration": 56
+    "candidateMigration": 56,
+    "status": "success-pending-owner-acceptance",
+    "deploymentId": "3af24ab9-9072-4ea6-b683-e5cb64aad60e",
+    "url": "https://3af24ab9.franchise-hq.pages.dev",
+    "deployedAt": "2026-11-19T04:26:23.91033Z",
+    "sourceCommit": "935e833915fcb137143414f92adf2f4e5b63c411"
   },
   "requiredArtifacts": [
     "releases/8.2.39/release-record.md",
     "releases/8.2.39/validation-evidence.json",
     "releases/8.2.39/recovery-plan.md"
-  ]
+  ],
+  "repositoryPublication": {
+    "status": "merged",
+    "pullRequest": 224,
+    "url": "https://github.com/itzpeckin/furiousgamingcommunity/pull/224",
+    "candidateCommit": "237c2ec22ba7cfd44f1a352611ebfe4c4e341914",
+    "mainCommit": "935e833915fcb137143414f92adf2f4e5b63c411",
+    "mergedAt": "2026-11-19T04:26:01Z"
+  }
 }
