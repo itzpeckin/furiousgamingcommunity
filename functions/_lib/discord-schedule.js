@@ -570,11 +570,15 @@ async function syncScheduleBatch(env,db,{
 
 export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,week,requestedByUserId,requestedBySessionId,source='candidate-import'}={}) {
   let effectiveSource=source;
+  let transitionKey='';
   if(source==='candidate-import'){
     const active=await activeSnapshot(db,league.id);
     if(!active||String(active.id)!==String(snapshotId))return{scheduled:false,reason:'snapshot-superseded'};
     if(snapshotCurrentPeriod(active)?.stage==='offseason')return{scheduled:false,status:'not-required',reason:'offseason-no-matchups'};
     const decision=await automaticScheduleDecision(db,league.id,active);
+    // A completed job under the old preseason rule may have created no threads.
+    // Give the corrected opening its own stable identity so retries run once.
+    if(decision.allowed&&decision.reason==='preseason-to-regular-opening')transitionKey='preseason-opening-v2:';
     if(!decision.allowed){
       if(await recoverableScheduleDecision(db,league.id,active))effectiveSource='rollover-recovery';
       // Same-week imports still run the durable result checkpoint.
@@ -600,7 +604,7 @@ export async function scheduleActiveDiscordSync(context,{db,league,snapshotId,we
     const response=await binding.fetch('https://franchise-import.internal/schedule/start',{
       method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
         leagueSlug:league.slug,origin,snapshotId,source:effectiveSource,
-        workflowKey:`${snapshotId}:${effectiveSource}:thread-history-v4-icons-only:${opening?.launched?'opening-week-one:':''}${presentationKey}`,importAuthToken:token
+        workflowKey:`${snapshotId}:${effectiveSource}:thread-history-v4-icons-only:${opening?.launched?'opening-week-one:':''}${transitionKey}${presentationKey}`,importAuthToken:token
       })
     }).catch(()=>null);
     if(!response)return{scheduled:false,reason:'durable-schedule-start-failed',

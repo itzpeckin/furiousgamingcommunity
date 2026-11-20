@@ -108,7 +108,10 @@ export function scheduleAdvanceDecision(previous,{period,proof,seasonYear,previo
   if(delta===0)return{...result,reason:'same-week',reviewRequired:false};
   if(delta<0)return{...result,reason:'backward-period'};
   const oneWeek=from.stage===to.stage&&to.week===from.week+1;
-  const preseasonOpening=from.stage==='preseason'&&[3,4].includes(from.week)&&to.stage==='regular-season'&&to.week===1;
+  // The last imported preseason snapshot need not be the final preseason week.
+  // Proven Regular Season Week 1 is the opening even when intervening preseason
+  // exports were skipped; ordinary regular-season gaps still require review.
+  const preseasonOpening=from.stage==='preseason'&&to.stage==='regular-season'&&to.week===1;
   return oneWeek||preseasonOpening?{...result,allowed:true,reviewRequired:false,reason:preseasonOpening?'preseason-to-regular-opening':'one-week-advance'}
     :{...result,reason:'skipped-period'};
 }
