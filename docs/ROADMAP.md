@@ -4,15 +4,15 @@
 
 **First customer league:** Furious Gaming Community (FGC)
 
-**Updated:** November 16, 2026
+**Updated:** November 19, 2026
 
 **Revision:** 3.12
 
-**Current production:** 8.2.37 Xbox link intake and scan delivery; Pages deployment `b8a8cd2e-162b-44f1-b50f-032e98f9e2fe` at Main commit `3f578da76cf3eda6bb202a6dd85595bce15c21ff`.
+**Current production:** 8.2.39 with the first Discord Week 1 repair; Pages deployment `8db36a9a-59c5-4143-a0a3-428063cf479c` at Main commit `d30d00e788dd449473a44422fde0c49088214a94`.
 
-**Current work:** 8.2.38 preserves completed screenshot checks when a submission cannot count for a matchup. Distinguish a missing team link from a linked owner posting in another matchup. Report-version refresh edits current reports using cached observations. The reported image was completely read; a wrong-thread override discarded the results before rendering. See releases/8.2.38/release-record.md.
+**Current work:** Complete the owner-authorized Discord Week 1 repair and live import. The first patch corrected proven preseason-to-Week-1 transitions. Its live rerun exposed a separate import fingerprint mismatch that reused an older candidate despite changed roster data. Unify preview and execution fingerprints, invalidate old workflow keys, and retain guarded delivery retries. See releases/8.2.39/discord-week-one-fix.md.
 
-**Next gate:** Complete strict and hosted checks, validate isolated preview, deploy Pages, then verify the existing report updates through the normal scanner without another image read. No scanner Worker change is required. Billing and provider acceptance remain deferred.
+**Next gate:** Complete strict and hosted checks, validate preview, publish the follow-up, and rerun the latest export. Verify that all 16 current Week 1 matchups have Discord threads with no delivery errors or duplicates. Billing and provider acceptance remain deferred.
 
 ## Product decisions
 

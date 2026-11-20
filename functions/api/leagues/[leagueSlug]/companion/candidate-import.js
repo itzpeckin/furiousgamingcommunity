@@ -448,13 +448,7 @@ async function startRun(current, destination, report, identity, retry) {
     ||(coverage.currentWeekStatus!=='covered'&&!coverage.nonPlayingPeriod))return{response:json({ok:false,
       error:'The export must prove the current Madden period and requires both schedule and statistics coverage for that period. Review the current-week source evidence before importing.',
       release:RELEASE,sourceCoverage:coverage,activeSnapshotChanged:false},409)};
-  const digest = bundle.digest || await captureDigest(current.db,current.league.id,report.session_id);
-  const fingerprint = await sha256Hex(new TextEncoder().encode(
-    candidateSourceFingerprintMaterial(
-      report.report_hash,digest,identity.preview_run_id || identity.franchise_season_id,destination.id
-      ,rosterCarryForward?.eligible ? rosterCarryForward.sourceSnapshotId : null
-    )
-  ));
+  const fingerprint = await sourceFingerprint(current.db,current.league.id,report,identity,destination,bundle,rosterCarryForward);
   let run = await current.db.prepare(`SELECT * FROM companion_candidate_import_runs
     WHERE league_id=? AND destination_id=? AND source_fingerprint=? LIMIT 1`)
     .bind(current.league.id,destination.id,fingerprint).first();

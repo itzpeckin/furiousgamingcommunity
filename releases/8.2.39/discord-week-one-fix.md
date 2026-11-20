@@ -16,9 +16,15 @@ Allow the verified preseason-to-Week-1 opening. Revalidate historical denied tra
 
 When a user reruns an already-completed retained import, reconcile Discord scheduling only for that workflow's exact imported candidate when it is still active and belongs to the selected tenant and source. Reuse validated league data and normal thread deduplication.
 
+The first production rerun exposed a second defect: the preview fingerprint included the full approved export, but import execution independently hashed only the selected weekly schedule/statistics. Eight changed team, standings, and roster payloads were therefore incorrectly treated as the previous completed import. Use the same full-source fingerprint for preview and execution, and advance the mapping revision so completed workflows using the old key cannot suppress the corrected import.
+
+For truly identical exports collected in separate sessions, completed-import delivery recovery requires equal report hashes and an exact nonempty match of retained route paths, payload hashes, and byte lengths. A matching report summary alone is insufficient. Keep the latest-import button available as **Re-run Import** when publication is complete but Discord delivery needs recovery.
+
 ## Validation evidence
 
-The strict repository gate passed all 742 tests, including migration continuity, syntax, secret scanning, inventory, and release contracts. Four final same-week regression checks also passed, including the added fresh-import recovery case. An independent code review found no actionable issue in source/tenant scoping, persisted proof validation, completion output handling, or thread/workflow deduplication. The gate ran from a clean source copy to exclude unrelated local export artifacts. Hosted preview, publication, and the authorized live import are pending.
+The first patch passed the strict repository gate and all 743 hosted tests, including migration continuity, syntax, secret scanning, inventory, and release contracts. Independent review found no actionable issue. PR #226 merged as `d30d00e788dd449473a44422fde0c49088214a94`; Pages deployment `8db36a9a-59c5-4143-a0a3-428063cf479c` succeeded. The authorized live rerun returned the earlier candidate and created no threads, revealing the preview/execution fingerprint mismatch described above.
+
+The follow-up passed the complete strict gate: **745/745 tests**, no failures or skips, and all repository, syntax, asset, secret, environment, migration, inventory, and release checks. Independent review confirmed shared fingerprint behavior and guarded cross-session delivery recovery. A production-shaped 2029 fixture with the retained denial and a fresh same-week import created exactly 16 Week 1 threads, no future threads, and no duplicate Discord calls on repeat; the prior manifest remained unchanged. Hosted checks, publication, and final live acceptance are pending.
 
 ## Deployment and rollback
 

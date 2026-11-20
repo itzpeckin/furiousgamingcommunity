@@ -642,8 +642,10 @@
     const live=Boolean(run?.activationPerformed);
     const yearlyScheduleImport=connection.state?.yearlyScheduleImport||null;
     const yearlyActive=['collecting','ready'].includes(yearlyScheduleImport?.status);
-    const runDisabled=busy||preparingImport||connection.busy||yearlyActive||exportStatus!=='ready'||!source||live||latestExportLive;
-    const runLabel=busy||connection.busy?'Working…':yearlyActive?'Finish or Switch Schedule First':live||latestExportLive?'Latest Export Live':run?.status==='failed'?'Retry Candidate Import':'Import Latest Export';
+    const deliveryRetry=Boolean((live||latestExportLive)
+      &&['not-started','failed','partial','review-required'].includes(state?.discordScheduleSync?.status));
+    const runDisabled=busy||preparingImport||connection.busy||yearlyActive||exportStatus!=='ready'||!source||((live||latestExportLive)&&!deliveryRetry);
+    const runLabel=busy||connection.busy?'Working…':yearlyActive?'Finish or Switch Schedule First':deliveryRetry?'Re-run Import':live||latestExportLive?'Latest Export Live':run?.status==='failed'?'Retry Candidate Import':'Import Latest Export';
     const activePhase=run?.currentPhase||(!source?'analyze-source':live?'preview-ready':'analyze-source');
     const activePhaseIndex=Math.max(0,PHASES.findIndex(([id])=>id===activePhase));
     const segment=100/PHASES.length,overall=Number(run?.progress||0),activeItem=run?.phaseState?.[activePhase];
