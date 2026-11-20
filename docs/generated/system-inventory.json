@@ -292,12 +292,12 @@
         "file": "trade-module.js"
       },
       {
-        "bytes": 250590,
-        "file": "functions/_lib/loadout-glyph-templates.js"
+        "bytes": 259357,
+        "file": "tests/discord/discord-bot.test.mjs"
       },
       {
-        "bytes": 249430,
-        "file": "tests/discord/discord-bot.test.mjs"
+        "bytes": 250590,
+        "file": "functions/_lib/loadout-glyph-templates.js"
       },
       {
         "bytes": 194467,
@@ -312,12 +312,12 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 105911,
-        "file": "league-engine/trade-center-live.js"
+        "bytes": 108923,
+        "file": "tests/import/candidate-import.test.mjs"
       },
       {
-        "bytes": 102028,
-        "file": "tests/import/candidate-import.test.mjs"
+        "bytes": 105911,
+        "file": "league-engine/trade-center-live.js"
       },
       {
         "bytes": 86628,

@@ -3,6 +3,7 @@ import { requireCommissioner } from '../../../../_lib/permissions.js';
 import { database, normalizeLeagueSlug, validLeagueSlug, resolveLeague } from '../../../../_lib/cloud-platform.js';
 import { createRandomToken, hashToken } from '../../../../_lib/auth.js';
 import { requireDatabaseSchema } from '../../../../_lib/database-schema.js';
+import { scheduleActiveDiscordSync } from '../../../../_lib/discord-schedule.js';
 
 const RELEASE='8.0.9';
 const json=(body,status=200)=>new Response(JSON.stringify(body,null,2),{
@@ -124,6 +125,29 @@ export async function onRequestPost(context){
       importAuthExpiresAt:delegation.expiresAt
     })
   });
+  const started=response.ok?await response.clone().json().catch(()=>null):null;
+  if(started?.ok&&started.reusedExisting
+    &&['complete','completed'].includes(String(started.status?.status||'').toLowerCase())){
+    // Completed import workflows are reused without running finalization again.
+    // Reconcile delivery only for that workflow's exact, still-live candidate.
+    const runId=text(started.status?.output?.run?.id);
+    const published=runId?await state.db.prepare(`SELECT run.candidate_snapshot_id AS snapshotId
+      FROM companion_candidate_import_runs run
+      JOIN league_active_snapshots active ON active.league_id=run.league_id
+        AND active.snapshot_id=run.candidate_snapshot_id
+      WHERE run.id=? AND run.league_id=? AND run.discovery_session_id=?
+        AND run.active_snapshot_id_after=run.candidate_snapshot_id LIMIT 1`)
+      .bind(runId,state.league.id,latest.session_id).first():null;
+    if(published){
+      const discordScheduleSync=await scheduleActiveDiscordSync(context,{
+        db:state.db,league:state.league,snapshotId:published.snapshotId,
+        requestedByUserId:state.auth.session.user.id,
+        requestedBySessionId:state.auth.session.sessionId,source:'candidate-import'
+      }).catch(()=>({scheduled:false,reason:'schedule-service-unavailable',
+        detail:'Your import is live. Open League Controls → Discord Bot and select Retry Schedule Sync.'}));
+      return json({...started,discordScheduleSync});
+    }
+  }
   return new Response(response.body,{status:response.status,headers:response.headers});
 }
 

@@ -189,9 +189,14 @@ test('current-period proof ignores schedule rows and requires exact forward tran
     {datasetType:'statistics',routePath:'xbsx/742482/week/reg/1/passing'}
   ]},{...previous,week_index:18,manifest_json:'{}'},{seasonYear:2027});
   assert.notEqual(nextSeason.importMode,'historical-backfill');assert.equal(nextSeason.activePeriod,null);
-  const preseason={...previous,week_index:3,manifest_json:JSON.stringify({currentPeriod:period('pre',3)})};
-  assert.equal(decision(period('reg',1),preseason).allowed,true);
-  assert.equal(decision(period('reg',2),preseason).allowed,false);
+  for(const week of [1,2,3,4]){
+    const preseason={...previous,week_index:week,manifest_json:JSON.stringify({currentPeriod:period('pre',week)})};
+    assert.equal(decision(period('reg',1),preseason).allowed,true);
+    assert.equal(decision(period('reg',1),preseason).reason,'preseason-to-regular-opening');
+    assert.equal(decision(period('reg',2),preseason).allowed,false);
+    assert.equal(decision(period('reg',1),preseason,{status:'ambiguous'}).allowed,false);
+    assert.equal(decision(period('reg',1),{...preseason,season_year:2025}).reason,'season-change');
+  }
   assert.equal(currentStatePeriodEvidence({weekIndex:' ',stageIndex:1},'xbsx/742482/league')[0].invalid,true);
   const ui=vm.createContext({window:{FranchiseHQ:{}}});
   return readFile(new URL('../../league-engine/week-context.js',import.meta.url),'utf8').then(code=>{
@@ -1029,6 +1034,107 @@ test('durable import selects the exact latest passed report rather than an older
     assert.equal(sent.retry,true);
     assert.equal(sqlite.prepare(`SELECT COUNT(*) count FROM server_import_delegations`).get().count,1);
   }finally{sqlite.close();}
+});
+
+async function completedImportRetryFixture(){
+  const sqlite=await database(),token='completed-import-retry-session';
+  sqlite.prepare(`INSERT INTO league_memberships (id,league_id,user_id,role,active)
+    VALUES ('membership-retry','league-1','commissioner-1','commissioner',1)`).run();
+  sqlite.prepare(`INSERT INTO sessions (id,user_id,session_token_hash,expires_at)
+    VALUES ('session-retry','commissioner-1',?,'2099-01-01T00:00:00.000Z')`).run(await hashToken(token));
+  sqlite.prepare(`INSERT INTO madden_discovery_reports
+    (id,league_id,session_id,status,report_hash)
+    VALUES ('report-retry','league-1','capture-1','passed','report-retry-hash')`).run();
+  sqlite.prepare(`UPDATE companion_league_export_endpoints
+    SET latest_ready_report_id='report-retry' WHERE league_id='league-1'`).run();
+  sqlite.prepare(`INSERT INTO companion_import_destinations
+    (id,league_id,franchise_season_id,label,status,created_by_user_id)
+    VALUES ('destination-retry','league-1','season-2026','Retry import','active','commissioner-1')`).run();
+  sqlite.prepare(`INSERT INTO league_snapshots
+    (id,league_id,status,season_year,week_index,manifest_json,validation_status)
+    VALUES ('snapshot-retry','league-1','active',2026,1,?,'ready')`).run(JSON.stringify({
+      currentPeriod:{stage:'regular-season',week:1},currentPeriodProof:{status:'proven'}
+    }));
+  sqlite.prepare(`INSERT INTO league_active_snapshots (league_id,snapshot_id,activated_by)
+    VALUES ('league-1','snapshot-retry','commissioner-1')`).run();
+  sqlite.prepare(`INSERT INTO companion_candidate_import_runs
+    (id,league_id,destination_id,discovery_session_id,source_fingerprint,status,current_phase,
+      candidate_snapshot_id,active_snapshot_id_after,created_by_user_id)
+    VALUES ('candidate-retry','league-1','destination-retry','capture-1',?,'preview-ready',
+      'preview-ready','snapshot-retry','snapshot-retry','commissioner-1')`).run('a'.repeat(64));
+  sqlite.prepare(`INSERT INTO discord_league_installations
+    (id,league_id,discord_guild_id,schedule_channel_id,status)
+    VALUES ('discord-retry','league-1','123456789012345678','223456789012345678','active')`).run();
+  const calls=[],binding=d1(sqlite);
+  const workflow={ok:true,id:'workflow-retry',reusedExisting:true,
+    status:{status:'complete',output:{run:{id:'candidate-retry'},candidateSnapshotId:'snapshot-retry'}}};
+  const context={params:{leagueSlug:'fgc'},env:{DB:binding,FRANCHISE_HQ_DB:binding,
+    FRANCHISE_IMPORT_WORKER:{fetch:async(url,options)=>{
+      calls.push({url,body:JSON.parse(options.body)});
+      if(url.endsWith('/start')&&!url.endsWith('/schedule/start'))return Response.json(workflow);
+      return Response.json({ok:true,id:'schedule-retry',status:{status:'queued'}});
+    }}}};
+  const invoke=()=>startImportJob({...context,
+    request:new Request('https://franchisehq.app/api/leagues/fgc/companion/import-job',{
+      method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},
+      body:JSON.stringify({sourceFingerprint:'a'.repeat(64)})
+    })});
+  return{sqlite,calls,workflow,invoke};
+}
+
+test('reusing a completed live import retries durable Discord delivery without rebuilding the snapshot',async()=>{
+  const fixture=await completedImportRetryFixture();
+  try{
+    for(let attempt=0;attempt<2;attempt++){
+      const response=await fixture.invoke(),payload=await response.json();
+      assert.equal(response.status,200);
+      assert.equal(payload.id,'workflow-retry');
+      assert.equal(payload.reusedExisting,true);
+      assert.equal(payload.discordScheduleSync.scheduled,true);
+      assert.equal(payload.discordScheduleSync.workflowId,'schedule-retry');
+    }
+    const schedules=fixture.calls.filter(call=>call.url.endsWith('/schedule/start'));
+    assert.equal(schedules.length,2);
+    assert.equal(schedules[0].body.snapshotId,'snapshot-retry');
+    assert.equal(schedules[0].body.source,'candidate-import');
+    assert.equal(schedules[0].body.workflowKey,schedules[1].body.workflowKey);
+    assert.equal(fixture.sqlite.prepare('SELECT COUNT(*) count FROM league_snapshots').get().count,1);
+    assert.equal(fixture.sqlite.prepare('SELECT COUNT(*) count FROM companion_candidate_import_runs').get().count,1);
+    assert.equal(fixture.sqlite.prepare('SELECT snapshot_id FROM league_active_snapshots').get().snapshot_id,'snapshot-retry');
+  }finally{fixture.sqlite.close();}
+});
+
+test('completed import delivery recovery requires the exact active published candidate and current source',async()=>{
+  const fixture=await completedImportRetryFixture();
+  try{
+    fixture.workflow.status.status='running';
+    assert.equal((await fixture.invoke()).status,200);
+    fixture.workflow.status.status='complete';
+    fixture.workflow.status.output.run.id='unrelated-candidate';
+    assert.equal((await fixture.invoke()).status,200);
+    fixture.workflow.status.output.run.id='candidate-retry';
+    fixture.sqlite.prepare(`UPDATE companion_candidate_import_runs SET active_snapshot_id_after=NULL
+      WHERE id='candidate-retry'`).run();
+    assert.equal((await fixture.invoke()).status,200);
+    fixture.sqlite.prepare(`UPDATE companion_candidate_import_runs SET active_snapshot_id_after='snapshot-retry'
+      WHERE id='candidate-retry'`).run();
+    fixture.sqlite.prepare(`INSERT INTO madden_discovery_sessions
+      (id,league_id,token_hash,status,expires_at)
+      VALUES ('capture-new','league-1','capture-new-hash','passed','2099-01-01T00:00:00.000Z')`).run();
+    fixture.sqlite.prepare(`INSERT INTO madden_discovery_reports (id,league_id,session_id,status,report_hash)
+      VALUES ('report-new','league-1','capture-new','passed','report-new-hash')`).run();
+    fixture.sqlite.prepare(`UPDATE companion_league_export_endpoints
+      SET latest_ready_report_id='report-new' WHERE league_id='league-1'`).run();
+    assert.equal((await fixture.invoke()).status,200);
+    fixture.sqlite.prepare(`UPDATE companion_league_export_endpoints
+      SET latest_ready_report_id='report-retry' WHERE league_id='league-1'`).run();
+    fixture.sqlite.prepare(`INSERT INTO league_snapshots (id,league_id,status,season_year,week_index,manifest_json)
+      VALUES ('snapshot-new','league-1','active',2026,2,'{}')`).run();
+    fixture.sqlite.prepare(`UPDATE league_active_snapshots SET snapshot_id='snapshot-new'
+      WHERE league_id='league-1'`).run();
+    assert.equal((await fixture.invoke()).status,200);
+    assert.equal(fixture.calls.filter(call=>call.url.endsWith('/schedule/start')).length,0);
+  }finally{fixture.sqlite.close();}
 });
 
 test('missing permanent endpoint never makes a private EA report the import source',async()=>{
