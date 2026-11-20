@@ -63,6 +63,31 @@ async function latestReadyReport(db,leagueId){
     WHERE endpoint.league_id=? AND report.status='passed' LIMIT 1`).bind(leagueId).first();
 }
 
+async function retainedCaptureIdentity(db,leagueId,sessionId){
+  const linked=await db.prepare(`SELECT capture.route_path,capture.payload_hash,capture.byte_length
+    FROM madden_discovery_session_captures link
+    JOIN companion_route_captures capture ON capture.id=link.capture_id AND capture.league_id=link.league_id
+    WHERE link.league_id=? AND link.session_id=?
+    ORDER BY capture.route_path,capture.payload_hash,capture.byte_length`)
+    .bind(leagueId,sessionId).all();
+  const captures=linked.results?.length?linked.results:(await db.prepare(`SELECT route_path,payload_hash,byte_length
+    FROM companion_route_captures WHERE league_id=? AND discovery_session_id=?
+    ORDER BY route_path,payload_hash,byte_length`).bind(leagueId,sessionId).all()).results||[];
+  return captures.map(capture=>[capture.route_path,capture.payload_hash,Number(capture.byte_length)]);
+}
+
+async function samePublishedSource(db,leagueId,published,latest){
+  if(published.discoverySessionId===latest.session_id)return true;
+  if(!published.reportHash||published.reportHash!==latest.report_hash)return false;
+  // Identical exports can share a candidate across separate collection sessions.
+  // Report summaries alone do not prove equality of roster or statistics payloads.
+  const [prior,current]=await Promise.all([
+    retainedCaptureIdentity(db,leagueId,published.discoverySessionId),
+    retainedCaptureIdentity(db,leagueId,latest.session_id)
+  ]);
+  return prior.length>0&&JSON.stringify(prior)===JSON.stringify(current);
+}
+
 async function latestImportRun(db,leagueId){
   const row=await db.prepare(`SELECT * FROM companion_candidate_import_runs
     WHERE league_id=? ORDER BY created_at DESC LIMIT 1`).bind(leagueId).first().catch(()=>null);
@@ -131,14 +156,17 @@ export async function onRequestPost(context){
     // Completed import workflows are reused without running finalization again.
     // Reconcile delivery only for that workflow's exact, still-live candidate.
     const runId=text(started.status?.output?.run?.id);
-    const published=runId?await state.db.prepare(`SELECT run.candidate_snapshot_id AS snapshotId
+    const published=runId?await state.db.prepare(`SELECT run.candidate_snapshot_id AS snapshotId,
+        run.discovery_session_id AS discoverySessionId,report.report_hash AS reportHash
       FROM companion_candidate_import_runs run
       JOIN league_active_snapshots active ON active.league_id=run.league_id
         AND active.snapshot_id=run.candidate_snapshot_id
-      WHERE run.id=? AND run.league_id=? AND run.discovery_session_id=?
+      LEFT JOIN madden_discovery_reports report
+        ON report.league_id=run.league_id AND report.session_id=run.discovery_session_id
+      WHERE run.id=? AND run.league_id=?
         AND run.active_snapshot_id_after=run.candidate_snapshot_id LIMIT 1`)
-      .bind(runId,state.league.id,latest.session_id).first():null;
-    if(published){
+      .bind(runId,state.league.id).first():null;
+    if(published&&await samePublishedSource(state.db,state.league.id,published,latest)){
       const discordScheduleSync=await scheduleActiveDiscordSync(context,{
         db:state.db,league:state.league,snapshotId:published.snapshotId,
         requestedByUserId:state.auth.session.user.id,

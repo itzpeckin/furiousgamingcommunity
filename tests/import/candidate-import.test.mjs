@@ -45,6 +45,17 @@ test('compact and detailed import panels share readiness, progress, busy and liv
   assert.match(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
   assert.doesNotMatch(service.renderCompactPanel(),/role="progressbar"/);
   assert.match(service.renderCompactPanel(),/Latest Export Live/);
+  for(const status of ['not-started','failed','partial','review-required']){
+    payload.discordScheduleSync={status};await service.refresh();
+    for(const html of [service.renderCompactPanel(),service.renderPanel()]){
+      assert.doesNotMatch(button(html,'data-import-latest-export'),/disabled/);
+      assert.match(html,/Re-run Import/);
+    }
+  }
+  for(const status of ['completed','running','not-required']){
+    payload.discordScheduleSync={status};await service.refresh();
+    assert.match(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
+  }
   payload={};await service.refresh();
   assert.match(button(service.renderCompactPanel(),'data-import-latest-export'),/disabled/);
 });
@@ -623,10 +634,10 @@ test('candidate coverage keeps future cumulative team summaries outside the prov
 });
 
 test('candidate fingerprints share one mapping revision across preview and start paths', () => {
-  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-statistics-selection-v14');
+  assert.equal(CANDIDATE_MAPPING_REVISION,'retained-full-source-selection-v15');
   assert.equal(
     candidateSourceFingerprintMaterial('report','capture','identity','destination'),
-    'report:capture:identity:destination:retained-statistics-selection-v14'
+    'report:capture:identity:destination:retained-full-source-selection-v15'
   );
   assert.match(candidateSourceFingerprintMaterial('report','capture','identity','destination','snapshot-1'),/:snapshot-1$/);
 });
@@ -640,6 +651,75 @@ test('unchanged weekly stats cannot hide new roster, team or Free Agent exports'
     {franchise_season_id:'season-1'},{id:'destination-1'},{digest:'unchanged-weekly-schedule-and-statistics'});
   let previous=await fingerprint();assert.equal(await fingerprint(),previous,'an unchanged export remains idempotent');
   for(const row of retained){row.payload_hash+='-changed';const changed=await fingerprint();assert.notEqual(changed,previous,`${row.route_path} must be importable`);assert.equal(await fingerprint(),changed);previous=changed;}
+});
+
+test('candidate start uses the preview fingerprint and imports changed rosters when weekly routes are unchanged',async()=>{
+  const fixture=await completedImportRetryFixture();
+  try{
+    const {sqlite}=fixture;
+    const inventory=[
+      {datasetType:'schedule',routePath:'xbsx/742482/week/reg/1/schedules',recordCount:16},
+      {datasetType:'statistics',routePath:'xbsx/742482/week/reg/1/passing',recordCount:0}
+    ];
+    const markers={currentPeriod:{status:'proven',source:'current-state-metadata',
+      period:{stage:'regular-season',week:1,key:'regular-season:1'}}};
+    sqlite.prepare(`UPDATE madden_discovery_reports SET source_markers_json=?,dataset_inventory_json=?,
+      requirement_results_json='{"players":{"recordCount":2}}',generated_at='2090-01-01T00:00:00.000Z'
+      WHERE id='report-retry'`).run(JSON.stringify(markers),JSON.stringify(inventory));
+    const retain=sqlite.prepare(`INSERT INTO companion_route_captures
+      (id,league_id,discovery_session_id,route_path,request_method,byte_length,payload_hash,r2_object_key)
+      VALUES (?,'league-1',?,?,'POST',100,?,?)`);
+    const link=sqlite.prepare(`INSERT INTO madden_discovery_session_captures
+      (league_id,session_id,capture_id,route_path,observed_at)
+      VALUES ('league-1',?,?,?,'2090-01-01T00:00:00.000Z')`);
+    const captures=[['weekly-schedule',inventory[0].routePath],['weekly-stats',inventory[1].routePath],
+      ['roster-original','xbsx/742482/team/1/roster']];
+    for(const [id,route] of captures){
+      retain.run(id,'capture-1',route,`hash-${id}`,`objects/${id}`);
+      link.run('capture-1',id,route);
+    }
+    const invoke=async(action)=>{
+      const context={...fixture.context,request:new Request('https://franchisehq.app/api/leagues/fgc/companion/candidate-import',{
+        method:action?'POST':'GET',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${fixture.token}`},
+        ...(action?{body:JSON.stringify({action})}:{})
+      })};
+      const response=await(action?candidateImport(context):getCandidateImport(context));
+      const payload=await response.json();
+      assert.equal(response.status,200,JSON.stringify(payload));
+      return payload;
+    };
+    const initialPreview=await invoke(),initial=await invoke('start');
+    assert.equal(initial.run.sourceFingerprint,initialPreview.source.sourceFingerprint);
+    assert.equal(initial.source.sourceFingerprint,initialPreview.source.sourceFingerprint);
+    assert.deepEqual(new Set(initial.run.sourceCounts.sourceCaptureIds),new Set(['weekly-schedule','weekly-stats']));
+    const duplicate=await invoke('start');
+    assert.equal(duplicate.reused,true);
+    assert.equal(duplicate.run.id,initial.run.id);
+    sqlite.prepare(`INSERT INTO madden_discovery_sessions
+      (id,league_id,token_hash,status,expires_at)
+      VALUES ('ea_weekly_changed','league-1','changed-weekly-token','passed','2099-01-01T00:00:00.000Z')`).run();
+    sqlite.prepare(`INSERT INTO madden_discovery_reports
+      (id,league_id,session_id,status,report_hash,source_markers_json,dataset_inventory_json,requirement_results_json,generated_at)
+      SELECT 'report-roster-changed',league_id,'ea_weekly_changed',status,report_hash,source_markers_json,
+        dataset_inventory_json,requirement_results_json,'2091-01-01T00:00:00.000Z'
+      FROM madden_discovery_reports WHERE id='report-retry'`).run();
+    for(const [id,route] of captures.slice(0,2))link.run('ea_weekly_changed',id,route);
+    retain.run('roster-changed','ea_weekly_changed',captures[2][1],'changed-roster-hash','objects/roster-changed');
+    link.run('ea_weekly_changed','roster-changed',captures[2][1]);
+    sqlite.prepare(`UPDATE companion_league_export_endpoints
+      SET latest_ready_report_id='report-roster-changed' WHERE league_id='league-1'`).run();
+    const changedPreview=await invoke(),changed=await invoke('start');
+    assert.notEqual(changedPreview.source.sourceFingerprint,initialPreview.source.sourceFingerprint);
+    assert.equal(changed.run.sourceFingerprint,changedPreview.source.sourceFingerprint);
+    assert.notEqual(changed.run.id,initial.run.id);
+    assert.equal(changed.run.discoverySessionId,'ea_weekly_changed');
+    assert.equal(changed.reused,false);
+    assert.deepEqual(changed.run.sourceCounts.sourceCaptureIds,initial.run.sourceCounts.sourceCaptureIds);
+    const repeated=await invoke('start');
+    assert.equal(repeated.run.id,changed.run.id);
+    assert.equal(repeated.reused,true);
+    assert.equal(sqlite.prepare('SELECT snapshot_id FROM league_active_snapshots').get().snapshot_id,'snapshot-retry');
+  }finally{fixture.sqlite.close();}
 });
 
 test('rosterless imports preserve players and contracts while safely rebasing changed Madden team IDs',async()=>{
@@ -1079,7 +1159,7 @@ async function completedImportRetryFixture(){
       method:'POST',headers:{'content-type':'application/json',cookie:`franchise_hq_session=${token}`},
       body:JSON.stringify({sourceFingerprint:'a'.repeat(64)})
     })});
-  return{sqlite,calls,workflow,invoke};
+  return{sqlite,calls,workflow,invoke,context,token};
 }
 
 test('reusing a completed live import retries durable Discord delivery without rebuilding the snapshot',async()=>{
@@ -1101,6 +1181,52 @@ test('reusing a completed live import retries durable Discord delivery without r
     assert.equal(fixture.sqlite.prepare('SELECT COUNT(*) count FROM league_snapshots').get().count,1);
     assert.equal(fixture.sqlite.prepare('SELECT COUNT(*) count FROM companion_candidate_import_runs').get().count,1);
     assert.equal(fixture.sqlite.prepare('SELECT snapshot_id FROM league_active_snapshots').get().snapshot_id,'snapshot-retry');
+  }finally{fixture.sqlite.close();}
+});
+
+test('completed import retries Discord after an identical export is deduplicated across collection sessions',async()=>{
+  const fixture=await completedImportRetryFixture();
+  try{
+    const {sqlite}=fixture;
+    sqlite.prepare(`INSERT INTO madden_discovery_sessions
+      (id,league_id,token_hash,status,expires_at)
+      VALUES ('capture-reexport','league-1','reexport-hash','passed','2099-01-01T00:00:00.000Z')`).run();
+    sqlite.prepare(`INSERT INTO madden_discovery_reports (id,league_id,session_id,status,report_hash)
+      VALUES ('report-reexport','league-1','capture-reexport','passed','report-retry-hash')`).run();
+    sqlite.prepare(`UPDATE companion_league_export_endpoints
+      SET latest_ready_report_id='report-reexport' WHERE league_id='league-1'`).run();
+    assert.equal((await fixture.invoke()).status,200);
+    assert.equal(fixture.calls.filter(call=>call.url.endsWith('/schedule/start')).length,0,
+      'matching summaries with no retained capture evidence cannot establish equivalence');
+    for(const route of ['league','rosters']){
+      sqlite.prepare(`INSERT INTO companion_route_captures
+        (id,league_id,discovery_session_id,route_path,request_method,byte_length,payload_hash,r2_object_key)
+        VALUES (?,'league-1','capture-1',?,'POST',100,?,?)`)
+        .run(`retained-${route}`,`xbsx/742482/${route}`,`hash-${route}`,`object-${route}`);
+      for(const session of ['capture-1','capture-reexport'])sqlite.prepare(`INSERT INTO madden_discovery_session_captures
+        (league_id,session_id,capture_id,route_path) VALUES ('league-1',?,?,?)`)
+        .run(session,`retained-${route}`,`xbsx/742482/${route}`);
+    }
+    for(const legacy of [false,true]){
+      if(legacy)sqlite.prepare(`DELETE FROM madden_discovery_session_captures WHERE session_id='capture-1'`).run();
+      const response=await fixture.invoke(),payload=await response.json();
+      assert.equal(response.status,200);
+      assert.equal(payload.discordScheduleSync.scheduled,true);
+    }
+    const schedules=fixture.calls.filter(call=>call.url.endsWith('/schedule/start'));
+    assert.equal(schedules.length,2);
+    assert.equal(schedules[0].body.snapshotId,'snapshot-retry');
+    assert.equal(schedules[0].body.workflowKey,schedules[1].body.workflowKey);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) count FROM companion_candidate_import_runs').get().count,1);
+    assert.equal(sqlite.prepare('SELECT snapshot_id FROM league_active_snapshots').get().snapshot_id,'snapshot-retry');
+    sqlite.prepare(`INSERT INTO companion_route_captures
+      (id,league_id,discovery_session_id,route_path,request_method,byte_length,payload_hash,r2_object_key)
+      VALUES ('changed-rosters','league-1','capture-reexport','xbsx/742482/rosters','POST',100,'changed-hash','changed-object')`).run();
+    sqlite.prepare(`UPDATE madden_discovery_session_captures SET capture_id='changed-rosters'
+      WHERE session_id='capture-reexport' AND capture_id='retained-rosters'`).run();
+    assert.equal((await fixture.invoke()).status,200);
+    assert.equal(fixture.calls.filter(call=>call.url.endsWith('/schedule/start')).length,2,
+      'equal report summaries cannot hide changed roster payloads');
   }finally{fixture.sqlite.close();}
 });
 

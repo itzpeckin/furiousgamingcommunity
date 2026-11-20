@@ -312,7 +312,7 @@
         "file": "functions/api/leagues/[leagueSlug]/transactions/canonical.js"
       },
       {
-        "bytes": 108923,
+        "bytes": 117370,
         "file": "tests/import/candidate-import.test.mjs"
       },
       {
@@ -324,7 +324,7 @@
         "file": "functions/api/leagues/[leagueSlug]/game-year-transition.js"
       },
       {
-        "bytes": 77429,
+        "bytes": 77447,
         "file": "index.html"
       },
       {
@@ -344,11 +344,11 @@
         "file": "functions/api/leagues/[leagueSlug]/trade-center.js"
       },
       {
-        "bytes": 58011,
+        "bytes": 58226,
         "file": "league-engine/one-click-import.js"
       },
       {
-        "bytes": 51215,
+        "bytes": 50943,
         "file": "functions/api/leagues/[leagueSlug]/companion/candidate-import.js"
       },
       {
